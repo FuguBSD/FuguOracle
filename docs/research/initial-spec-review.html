@@ -1,0 +1,741 @@
+<title>FuguOracle Spec Review</title>
+<style>
+  :root {
+    --paper: #F7F7F4;
+    --ink: #1C2326;
+    --muted: #55615F;
+    --accent: #20666E;
+    --rule: #D9DDD7;
+    --rule-soft: #E6E9E3;
+    --panel: #EFF1EC;
+    --hi: #A93A2C;
+    --med: #96690F;
+    --lo: #5C6B70;
+    --hi-bg: rgba(169, 58, 44, 0.08);
+    --med-bg: rgba(150, 105, 15, 0.09);
+    --lo-bg: rgba(92, 107, 112, 0.09);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Source Serif 4", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181A;
+      --ink: #D8DEDB;
+      --muted: #93A09D;
+      --accent: #6FB4BC;
+      --rule: #2B3335;
+      --rule-soft: #222A2C;
+      --panel: #1B2124;
+      --hi: #E0796B;
+      --med: #D2A24C;
+      --lo: #94A4A9;
+      --hi-bg: rgba(224, 121, 107, 0.10);
+      --med-bg: rgba(210, 162, 76, 0.10);
+      --lo-bg: rgba(148, 164, 169, 0.10);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181A;
+    --ink: #D8DEDB;
+    --muted: #93A09D;
+    --accent: #6FB4BC;
+    --rule: #2B3335;
+    --rule-soft: #222A2C;
+    --panel: #1B2124;
+    --hi: #E0796B;
+    --med: #D2A24C;
+    --lo: #94A4A9;
+    --hi-bg: rgba(224, 121, 107, 0.10);
+    --med-bg: rgba(210, 162, 76, 0.10);
+    --lo-bg: rgba(148, 164, 169, 0.10);
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0rem;
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+  .sheet { max-width: 47rem; margin: 0 auto; }
+  .manhead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.06em;
+    color: var(--muted); margin-bottom: 2.2rem;
+  }
+  h1 {
+    font-family: var(--mono); font-weight: 600; font-size: 1.55rem;
+    letter-spacing: 0.01em; margin: 0 0 0.4rem; text-wrap: balance; color: var(--ink);
+  }
+  .subtitle { color: var(--muted); font-size: 1.02rem; margin: 0 0 2.4rem; max-width: 40rem; }
+  h2 {
+    font-family: var(--mono); font-weight: 600; font-size: 0.82rem;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+    margin: 3rem 0 1rem; display: flex; align-items: center; gap: 0.9rem;
+  }
+  h2::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+  h3 {
+    font-family: var(--mono); font-weight: 600; font-size: 0.78rem;
+    letter-spacing: 0.10em; text-transform: uppercase; color: var(--accent);
+    margin: 2.2rem 0 0.9rem;
+  }
+  p { margin: 0 0 0.9rem; max-width: 44rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  .statrow {
+    display: flex; flex-wrap: wrap; gap: 0;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    margin: 1.6rem 0 1.8rem;
+  }
+  .stat { padding: 0.85rem 1.4rem 0.85rem 0; margin-right: 1.4rem; }
+  .stat + .stat { border-left: 1px solid var(--rule-soft); padding-left: 1.4rem; }
+  .stat b {
+    display: block; font-family: var(--mono); font-size: 1.5rem; font-weight: 600;
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+  }
+  .stat span {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .stat.hi b { color: var(--hi); }
+  .stat.med b { color: var(--med); }
+  .stat.lo b { color: var(--lo); }
+  table { border-collapse: collapse; font-size: 0.92rem; width: 100%; }
+  .tablewrap { overflow-x: auto; margin: 0 0 1rem; }
+  th {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.10em;
+    text-transform: uppercase; color: var(--muted); text-align: left;
+    padding: 0.4rem 1.2rem 0.4rem 0; border-bottom: 1px solid var(--rule); font-weight: 600;
+  }
+  td { padding: 0.42rem 1.2rem 0.42rem 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  ul { margin: 0 0 1rem; padding-left: 1.2rem; max-width: 44rem; }
+  li { margin-bottom: 0.5rem; }
+  li::marker { color: var(--muted); }
+  .finding {
+    border-left: 3px solid var(--lo); background: var(--lo-bg);
+    padding: 0.95rem 1.15rem 0.85rem; margin: 0 0 0.9rem; border-radius: 0 2px 2px 0;
+  }
+  .finding.hi { border-left-color: var(--hi); background: var(--hi-bg); }
+  .finding.med { border-left-color: var(--med); background: var(--med-bg); }
+  .finding-head { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 0.45rem; }
+  .sev {
+    font-family: var(--mono); font-size: 0.64rem; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+    color: var(--lo);
+  }
+  .finding.hi .sev { color: var(--hi); }
+  .finding.med .sev { color: var(--med); }
+  .finding-title { font-weight: 700; font-size: 1.0rem; line-height: 1.35; text-wrap: balance; }
+  .finding p { font-size: 0.94rem; margin-bottom: 0.55rem; }
+  .fix { font-size: 0.94rem; margin-bottom: 0.55rem; }
+  .fix b { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-right: 0.3rem; }
+  .refs {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+    letter-spacing: 0.02em; overflow-wrap: anywhere;
+  }
+  .tag {
+    font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--paper); background: var(--accent);
+    padding: 0.1rem 0.4rem; border-radius: 2px; white-space: nowrap;
+  }
+  .note {
+    border: 1px solid var(--rule); background: var(--panel);
+    padding: 0.9rem 1.1rem; font-size: 0.94rem; margin: 1.2rem 0; max-width: 44rem;
+  }
+  .foot {
+    margin-top: 3.5rem; border-top: 1px solid var(--rule); padding-top: 1rem;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em;
+    line-height: 1.7;
+  }
+</style>
+
+<div class="sheet">
+  <div class="manhead"><span>FUGUORACLE-REVIEW(7)</span><span>2026-08-16</span><span>FUGUORACLE-REVIEW(7)</span></div>
+
+  <h1>FuguOracle Spec Review</h1>
+  <p class="subtitle">A critical review of the FuguOracle specification against the Blockstream reference
+  implementations, from five angles: wire compatibility, client compatibility, security,
+  OpenBSD fit, and internal consistency.</p>
+
+  <h2>Verdict</h2>
+  <p>The cryptographic and wire core of the specification is sound. Every byte-level claim
+  that the review probed matches the upstream server, the libwally C source, and the
+  production Jade client. The review confirmed 34 defects. Five are high severity.
+  Four of the five highs share one root cause: the failure-path taxonomy. Decision D-10
+  routes every post-decryption failure to HTTP 200 with a junk key. Upstream does not do
+  this. The rule diverges from upstream, contradicts the spec's own 500 rules, and makes
+  the D-12 byte-identical acceptance gate unsatisfiable as written. A junk 200 on
+  <code>set_pin</code> also silently bricks a Jade wallet. The fifth high is a bring-up
+  blocker: the keygen pledge set forbids the chown that the same unit requires.
+  The fix path is narrow. Rescope D-10 and D-12 with human approval. Assign explicit
+  statuses to <code>set_pin</code> and payload-extraction failures. Repair the keygen
+  sandbox. The remaining findings are internal contradictions, client-documentation gaps,
+  and hardening polish.</p>
+
+  <div class="statrow">
+    <div class="stat"><b>34</b><span>findings</span></div>
+    <div class="stat hi"><b>5</b><span>high</span></div>
+    <div class="stat med"><b>11</b><span>medium</span></div>
+    <div class="stat lo"><b>18</b><span>low</span></div>
+    <div class="stat"><b>0</b><span>refuted</span></div>
+  </div>
+
+  <h2>Scope</h2>
+  <p>The review target is the specification only. The repository holds no implementation code.
+  Every finding names a defect in the spec: a divergence from reference behavior, a security
+  gap in the design, a contradiction, or a material omission.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Source</th><th>Revision</th><th>Role</th></tr>
+    <tr><td><code>dickolsson/FuguOracle</code> spec/</td><td><code>9a7f70d</code></td><td>Review target</td></tr>
+    <tr><td><code>Blockstream/blind_pin_server</code></td><td><code>2260709</code></td><td>Upstream server (protocol v2)</td></tr>
+    <tr><td><code>Blockstream/Jade</code> firmware</td><td><code>5ad8566</code></td><td>Production client (<code>pinclient.c</code>)</td></tr>
+    <tr><td><code>ElementsProject/libwally-core</code></td><td><code>3bf543c</code></td><td>Crypto semantics the wire assumes</td></tr>
+  </table></div>
+
+  <h2>What held up</h2>
+  <p>A critical review must also state what survived attack. These properties were probed
+  directly against primary sources and empirical execution, and they held:</p>
+  <ul>
+    <li><b>Envelope layout.</b> The parse order and offsets (<code>cke[0:33]</code>,
+      <code>counter[33:37]</code>, <code>encrypted[37:]</code>) are byte-exact against upstream.
+      The 101-byte minimum equals libwally's effective decrypt floor.</li>
+    <li><b>Tweak derivation.</b> <code>m = SHA256(HMAC-SHA256(key=cke, msg=counter))</code> and
+      the BIP341 x-only private tweak with even-Y negation match <code>server.py</code>,
+      libwally, and Jade <code>pinclient.c</code> line for line. The spec's warning that a plain
+      scalar add differs is correct and important.</li>
+    <li><b>Envelope crypto.</b> Keys split 32/32 from <code>HMAC-SHA512(shared, label)</code>;
+      the MAC covers IV‖ct only; the labels match byte for byte with no NUL. Encrypt-then-MAC
+      order matches. Ciphertext splicing across requests fails because the ECDH secret binds
+      <code>cke</code> and the counter through the tweak.</li>
+    <li><b>Payload and signature.</b> The 97/129-byte forms, the signed message
+      <code>H(cke‖counter‖pin_secret‖entropy)</code>, and <code>recid = (sig[0]−27)&amp;3</code>
+      match libwally exactly. The 96-byte response envelope matches Jade's hard
+      <code>SERVER_REPLY_PAYLOAD_LEN</code> requirement.</li>
+    <li><b>Storage stack.</b> All three key derivations, the hex-of-SHA256 filenames, the
+      129-byte version-0x01 record, the 69-byte plaintext, the get_pin thresholds, the wipe
+      values, and set_pin's replay reset match upstream field by field.</li>
+    <li><b>Blindness.</b> STORE-KEYS-2 is sound: the record key derives from the un-stored
+      <code>pin_pubkey</code>, so disk plus the static key yields no record plaintext.</li>
+    <li><b>Anti-replay.</b> The strictly-greater, gap-tolerant check is exactly right for
+      Jade's device-global, never-reset counter.</li>
+    <li><b>Sandbox idiom.</b> The pledge–unveil–repledge sequence in SEC-SANDBOX is canonical
+      and its promise set is sufficient for the CGI program (verified against
+      <code>pledge(2)</code> and libc sources).</li>
+    <li><b>Simplicity wins.</b> The single global lock plus atomic writes are simpler and more
+      correct than upstream, which has neither. Static linking, the libc primitive choices, and
+      the BUILD_DEPENDS-only packaging are accurate OpenBSD practice.</li>
+    <li><b>Structure.</b> <code>spec_check.py</code> passes: 39 units, 116 rules, and every
+      anchor, citation, and numeric size claim resolves and verifies.</li>
+  </ul>
+
+  <h2>Findings — wire-protocol compatibility</h2>
+
+  <div class="finding hi">
+    <div class="finding-head"><span class="sev">High</span>
+      <span class="finding-title">The set_pin junk path is wire-incompatible with upstream and silently bricks a Jade wallet</span></div>
+    <p>D-10, PROTO-HTTP-8, and OPS-JUNK route every post-decryption failure to HTTP 200 with a
+    junk key. Upstream has no junk path in <code>set_pin</code>: a replay violation, missing
+    entropy, or a corrupt record raises, and Flask returns HTTP 500. Upstream tests pin this as
+    intentional ("Set-pin should fail more overtly"). A Jade cannot detect a junk key on the set
+    flow. It decrypts the envelope, derives the final key from the junk value, persists the
+    wallet under it, and reports success. Every later unlock then fails until the local
+    three-strike counter erases the wallet. A spec-conformant implementation diverges on
+    client-observable paths and violates D-12.</p>
+    <p class="fix"><b>Fix</b> Scope the junk path to <code>get_pin</code> only, exactly as
+    upstream. Specify HTTP 500 for every <code>set_pin</code> failure after envelope decryption.
+    Amend D-10 with human approval. Record the set_pin silent-failure hazard in clients.md.</p>
+    <div class="refs">D-10 · D-12 · PROTO-HTTP-8 · OPS-JUNK-1 · OPS-SET-2 — pindb.py:252–301, flaskserver.py:104–115, test_pinserver.py:569–606, pinclient.c:316–346</div>
+  </div>
+
+  <div class="finding hi">
+    <div class="finding-head"><span class="sev">High</span>
+      <span class="finding-title">Payload-extraction failures take the junk path per spec but return 500 upstream; the junk formula is uncomputable</span></div>
+    <p>Upstream extracts the payload fields outside its junk try-block on both endpoints. A bad
+    payload length, a wrong-length entropy, or a failed signature recovery raises and yields
+    HTTP 500, pinned by upstream unit tests. The spec routes these post-decryption failures to
+    the 200-junk path. The junk formula <code>HMAC(random32, pin_secret)</code> is also
+    uncomputable when the decrypted plaintext is too short to contain <code>pin_secret</code>.</p>
+    <p class="fix"><b>Fix</b> Assign HTTP 500 to payload-length, entropy-length, and
+    signature-recovery failures on both endpoints. Scope OPS-JUNK-1 to failures that occur after
+    successful extraction of <code>pin_secret</code> and <code>pin_pubkey</code>.</p>
+    <div class="refs">PROTO-PAYLOAD-1 · PROTO-PAYLOAD-4 · OPS-JUNK-1 · D-10 · D-12 — pindb.py:106–129, 252–274, test_pindb.py:523–532</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">Pre-decryption statuses 400/413 diverge from upstream's 500s, and the deviation is unmarked</span></div>
+    <p>The spec mandates 400 for malformed JSON, bad base64, and short envelopes, and 413 for
+    bodies over 4096 bytes. Upstream re-raises every parse exception to a Flask 500 and has no
+    body-size limit. Upstream base64 decoding also silently discards non-alphabet characters
+    that the spec rejects. Honest Jade clients never hit these paths. But the spec never marks
+    these statuses as deliberate deviations, so D-12 and TEST-FUZZ-1 fail over these inputs by
+    construction.</p>
+    <p class="fix"><b>Fix</b> List the status and base64 deviations in the OVR-SCOPE deviation
+    table. Scope D-12 acceptance to well-formed requests.</p>
+    <div class="refs">PROTO-HTTP-2 · PROTO-HTTP-3 · D-12 · TEST-FUZZ-1 — flaskserver.py:84–115</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">No status is assigned to an envelope MAC or decrypt failure; the junk boundary is ambiguous</span></div>
+    <p>No rule assigns an HTTP status to a failed envelope tag check, decryption, or unpad.
+    PROTO-HTTP-8 reserves error statuses for failures before envelope decryption, and OPS-JUNK
+    covers failures after decryption. A MAC failure sits in neither bucket. An envelope of 38 to
+    100 bytes also fails the 101-byte floor with no stated status. Upstream tests pin this
+    failure class to HTTP 500 on both endpoints.</p>
+    <p class="fix"><b>Fix</b> Add a rule: an envelope that fails the length check, the MAC
+    check, or CBC decryption answers status 500. Draw the junk boundary at successful envelope
+    decryption.</p>
+    <div class="refs">PROTO-CRYPTO-3 · PROTO-HTTP-8 · PROTO-ENVELOPE-1 — test_pinserver.py:452–470, lib.py:58–65</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The JSON request grammar is underspecified; the "recursive-descent scanner" is over-specified</span></div>
+    <p>PROTO-HTTP-7 mandates a recursive-descent scanner for a grammar that has no recursion.
+    The rule does not state whether the scanner ignores or rejects extra members, whitespace,
+    member order, duplicate keys, or string escapes. Upstream <code>json.loads</code> accepts
+    all of these. This unspecified surface is where real fuzz divergence will appear.</p>
+    <p class="fix"><b>Fix</b> Specify a minimal linear scanner and the exact accepted grammar:
+    ignore unknown members, require a plain base64 string with no escapes, define whitespace
+    handling.</p>
+    <div class="refs">PROTO-HTTP-7 · D-12 — flaskserver.py:107–109</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The padding note "always with at least one pad block" is factually wrong</span></div>
+    <p>The interop note says libwally always adds at least one pad block on encrypt. Empirical
+    tests with wallycore 1.5.6 show standard PKCS#7 with 1 to 16 pad bytes. A full pad block
+    occurs only for block-aligned plaintext. A literal reading yields wrong ciphertext sizes
+    for the 97- and 129-byte payloads. The correct request envelope sizes are 197 and 229
+    bytes.</p>
+    <p class="fix"><b>Fix</b> Replace the note: libwally pads PKCS#7 with 1 to 16 bytes. State
+    the exact envelope sizes 197 and 229.</p>
+    <div class="refs">PROTO-CRYPTO-3 · PROTO-CRYPTO-4 — libwally src/aes.c:156–216</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The lenient-unpad equivalence claim is incomplete; strict EVP unpad diverges on MAC-valid bad-pad input</span></div>
+    <p>Libwally's decrypt never fails on invalid padding, while the spec's strict EVP decrypt
+    does. For a MAC-valid ciphertext with bad padding, upstream returns 500 and a
+    spec-conformant service returns a different result. Only a party that holds the derived keys
+    can build this input, so honest clients are unaffected. A D-12 byte-identity test over such
+    vectors still fails.</p>
+    <p class="fix"><b>Fix</b> Extend the interop note to state the divergence. Exclude forged
+    bad-pad vectors from byte-identity testing.</p>
+    <div class="refs">PROTO-CRYPTO-3 · D-12 — libwally src/aes.c:173–178</div>
+  </div>
+
+  <h2>Findings — spec consistency and process</h2>
+
+  <div class="finding hi">
+    <div class="finding-head"><span class="sev">High</span>
+      <span class="finding-title">D-10's blanket junk mandate is contradicted by the spec's own 500 rules</span></div>
+    <p>D-10, PROTO-HTTP-8, and the OPS-JUNK preamble state that every post-decryption failure
+    returns 200 with a junk key. OPS-SET-2 and PROTO-HTTP-4 require 500 for a corrupt record,
+    which is only detectable after decryption. The rules match upstream and the decision does
+    not. PROTO-HTTP-4 applied to <code>get_pin</code> would in turn diverge from upstream,
+    which answers a corrupt record on <code>get_pin</code> with 200-junk, exactly as OPS-GET-2
+    says. An implementer receives two conflicting normative answers with no precedence rule.</p>
+    <p class="fix"><b>Fix</b> Rewrite D-10 with human approval: scope the junk guarantee to
+    <code>get_pin</code>. Restrict PROTO-HTTP-4's 500 to true I/O errors and the
+    <code>set_pin</code> path. Align PROTO-HTTP-8 and the OPS-JUNK preamble with the same
+    scope.</p>
+    <div class="refs">D-10 · PROTO-HTTP-4 · PROTO-HTTP-8 · OPS-JUNK-1 · OPS-GET-2 · OPS-SET-2</div>
+  </div>
+
+  <div class="finding hi">
+    <div class="finding-head"><span class="sev">High</span>
+      <span class="finding-title">D-12 byte-identical acceptance and TEST-FUZZ-1 are not executable as written</span></div>
+    <p>D-12 requires the same bytes as upstream, given a fixed random source. Upstream has no
+    injectable random seam; it calls <code>os.urandom</code> directly at every draw site. The
+    spec never pins the RNG draw order that determines the bytes. TEST-FUZZ-1 requires an
+    identical status class, but the spec's own 400/413 deviations produce 4xx where upstream
+    produces 5xx for every malformed-body mutation. The acceptance gate cannot pass as
+    specified.</p>
+    <p class="fix"><b>Fix</b> Scope D-12 and TEST-ACCEPT-1 to the decrypted wire bytes of
+    successful and junk responses. Specify the harness (monkey-patched upstream
+    <code>os.urandom</code>) and the exact draw order per operation. Restate TEST-FUZZ-1's
+    oracle as identical accept/junk/real decisions.</p>
+    <div class="refs">D-12 · TEST-ACCEPT-1 · TEST-FUZZ-1 · SEC-RANDOM-2 · OVR-SCOPE</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">OPS-WIPE-1's in-place overwrite contradicts STORE-ATOMIC-3's universal mkstemp+rename rule</span></div>
+    <p>STORE-ATOMIC-3 requires every record write to use mkstemp plus rename. OPS-WIPE-1
+    requires an in-place overwrite of the record. Both rules use "must", and no carve-out
+    reconciles them. A rename-based wipe writes a fresh inode and never touches the old blocks,
+    which defeats the stated media-recovery purpose. An in-place write is not crash-atomic. The
+    two rules are mutually unsatisfiable for the same operation.</p>
+    <p class="fix"><b>Fix</b> Add an explicit exemption: the wipe opens the existing record file
+    and writes in place (write, fsync, unlink), intentionally non-atomic.</p>
+    <div class="refs">STORE-ATOMIC-3 · OPS-WIPE-1 · OPS-WIPE-2</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">testing.md misses tests for several load-bearing properties</span></div>
+    <p>No test asserts junk-response uniformity in status, envelope length, and headers, which
+    is the actual OPS-JUNK-2 property. No test inspects the pre-unlink record content of the
+    wipe, which is invisible on the wire. No test covers lock serialization or crash atomicity,
+    a stated correction over upstream. No test covers the HTTP status rules or OPS-SET-2's 500.
+    TEST-KAT-1 omits the RNG draw-order determinism that TEST-ACCEPT-1 depends on.</p>
+    <p class="fix"><b>Fix</b> Add a junk-uniformity regress test, a wipe-record file inspection,
+    a lock and torn-write test, HTTP-status tests, and a draw-order determinism vector.</p>
+    <div class="refs">TEST-KAT-1 · TEST-INTEROP-1 · TEST-ACCEPT-1 · OPS-JUNK-2 · STORE-ATOMIC</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">OVR-PURPOSE is registered n-a although it carries four must-rules</span></div>
+    <p>STATUS.md marks OVR-PURPOSE as n-a, defined as "no code can implement the unit". The unit
+    contains four bold-lead must-rules. The sibling n-a units contain no rules, so OVR-PURPOSE
+    is the outlier. <code>spec_check.py</code> validates structure only and cannot catch
+    this.</p>
+    <p class="fix"><b>Fix</b> Move OVR-PURPOSE to an open state with a phase, or strip the rule
+    markers.</p>
+    <div class="refs">OVR-PURPOSE · STATUS.md</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">Terminology drift: "PIN proof", the 129-byte "envelope", and the "per client key" counter scope</span></div>
+    <p>index.md's "PIN proof" never recurs; the protocol uses <code>pin_secret</code> and
+    <code>sig</code>. OPS-WIPE-1 calls the 129-byte record an "envelope", a term the protocol
+    reserves for the wire envelope. The envelope table says the replay counter is "strictly
+    monotonic per client key" directly under the row that defines <code>cke</code>, but the
+    counter is monotonic per <code>pin_pubkey</code> record. An implementer who binds the
+    counter to <code>cke</code> builds a replay check that never fires, because
+    <code>cke</code> changes on every request.</p>
+    <p class="fix"><b>Fix</b> Say "record" in OPS-WIPE-1. Replace "PIN proof". Change the table
+    cell to "strictly monotonic per pin_pubkey record (see OPS-GET-2)".</p>
+    <div class="refs">PROTO-ENVELOPE · OPS-WIPE-1 · OPS-GET-2</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">OPS-WIPE-1 omits the hash_pin_secret content of the overwrite record</span></div>
+    <p>OPS-WIPE-1 specifies <code>aes_key</code>, <code>count</code>, and
+    <code>replay_counter</code> for the pre-unlink overwrite but not the
+    <code>hash_pin_secret</code> field. Upstream keeps the previously stored hash. An
+    implementer must guess the remaining 32 bytes of the plaintext.</p>
+    <p class="fix"><b>Fix</b> State that the overwrite keeps the stored
+    <code>hash_pin_secret</code>, so the full 69-byte plaintext is defined.</p>
+    <div class="refs">OPS-WIPE-1 — pindb.py:229–241</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">Systematic ASD-STE100 deviations: compound rule sentences</span></div>
+    <p>Many rules chain two or three instructions in one sentence with "and must", against the
+    project's own one-instruction-per-sentence standard. Examples occur in seven documents. A
+    few passive constructions remain. <code>spec_check.py</code> does not lint sentence
+    structure, so the pattern passes CI.</p>
+    <p class="fix"><b>Fix</b> Split compound rules into numbered sub-sentences, or explicitly
+    permit the pattern in spec/CLAUDE.md.</p>
+    <div class="refs">OPS-GET-2 · OPS-GET-4 · ARCH-STACK-1 · DEPLOY-HTTPD-1 · PROTO-RESPONSE-3</div>
+  </div>
+
+  <h2>Findings — OpenBSD fit and simplicity</h2>
+
+  <div class="finding hi">
+    <div class="finding-head"><span class="sev">High</span>
+      <span class="finding-title">The keygen pledge set forbids the chown that PROG-KEYGEN-2 requires; bring-up fails</span></div>
+    <p>PROG-KEYGEN-2 requires the key file with owner <code>_fuguoracle:_fuguoracle</code> and
+    mode 0400. PROG-KEYGEN-5 pledges only "stdio rpath wpath cpath". <code>pledge(2)</code>
+    gates ownership changes behind the "chown" promise and attribute changes behind "fattr", so
+    the required <code>fchown(2)</code> kills the process. Unveil of only the target directory
+    also blocks <code>getpwnam(3)</code>'s read of <code>/etc/pwd.db</code>. The bring-up
+    procedure aborts, or leaves a root-owned key the CGI cannot read.</p>
+    <p class="fix"><b>Fix</b> Change PROG-KEYGEN-5 to pledge "stdio rpath wpath cpath fattr
+    chown getpw". State the unveil permission string for the target directory.</p>
+    <div class="refs">PROG-KEYGEN-2 · PROG-KEYGEN-5 · DEPLOY-SERVICE-1 — pledge(2)</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">SEC-LOGGING-1's /var/www/dev/log mechanism is false and conflicts with the sandbox</span></div>
+    <p>SEC-LOGGING-1 says the program logs over <code>/var/www/dev/log</code> and that default
+    syslogd creates that socket in the chroot. OpenBSD libc <code>syslog(3)</code> delivers with
+    the <code>sendsyslog(2)</code> syscall, which needs no socket and works in any chroot.
+    Default syslogd creates no such socket. The sandbox grants no "unix" promise and does not
+    unveil the socket path, so a literal socket connection is impossible. Logging via the
+    specified API works anyway under the "stdio" promise; the stated mechanism is wrong.</p>
+    <p class="fix"><b>Fix</b> Rewrite SEC-LOGGING-1 and the ARCH-DEPS row: <code>syslog(3)</code>
+    delivers via <code>sendsyslog(2)</code> under the stdio promise. Drop the
+    <code>/var/www/dev/log</code> requirement.</p>
+    <div class="refs">SEC-LOGGING-1 · ARCH-DEPS · SEC-SANDBOX-2 — syslog(3), sendsyslog(2)</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">storage.md's relative paths break under slowcgi's chdir and contradict PROG-CGI-4</span></div>
+    <p>slowcgi chdirs the CGI child to the script's own directory before execve. STORE-ATOMIC-1
+    spells the literal call <code>open("pins/.lock", …)</code>, and STORE-KEYS-3 gives relative
+    record paths. A literal implementation opens <code>/cgi-bin/pins/…</code> inside the chroot,
+    which the unveil set rejects. PROG-CGI-4 fixes the correct chroot-relative constants. The
+    two normative documents contradict.</p>
+    <p class="fix"><b>Fix</b> Express every storage.md path through the PROG-CGI-4 constants
+    (<code>PINS_DIR "/.lock"</code>, <code>PINS_DIR "/&lt;hex&gt;.pin"</code>). State the path
+    convention in one sentence.</p>
+    <div class="refs">STORE-ATOMIC-1 · STORE-KEYS-3 · PROG-CGI-4 · SEC-SANDBOX-3</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">The CGI environment and error-surface contract is incomplete</span></div>
+    <p>PROG-CGI-2's "CONTENT_LENGTH capped at 4096" reads as truncate-and-continue, while
+    PROTO-HTTP-2 requires a 413 rejection. The spec never names the CGI variable that carries
+    the request path under the shipped httpd.conf, which passes the same SCRIPT_FILENAME for all
+    locations. Missing or non-numeric CONTENT_LENGTH has no rule. Error and liveness response
+    bodies and their Content-Type are undefined. SEC-LOGGING-2's outcome classes are never
+    enumerated.</p>
+    <p class="fix"><b>Fix</b> Add rules for CONTENT_LENGTH handling, the routing variable and
+    its expected values, the body shape and Content-Type of error and liveness responses, and
+    the enumerated log outcome classes.</p>
+    <div class="refs">PROG-CGI-1 · PROG-CGI-2 · PROTO-HTTP-2 · PROTO-HTTP-6 · SEC-LOGGING-2</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The httpd.conf sketch skips "connection max request body" and leaves platform timeouts unstated</span></div>
+    <p>The deployment configuration does not set "connection max request body". httpd then
+    forwards bodies up to its 1&nbsp;MiB default, and the 4096-byte cap rests entirely on the
+    CGI's own check. The spec never mentions the platform timeouts that bound a request. This is
+    defense-in-depth polish.</p>
+    <p class="fix"><b>Fix</b> Add the body cap to the deployment sketch. Note the default
+    slowcgi and httpd timeouts.</p>
+    <div class="refs">DEPLOY-HTTPD-1 · PROTO-HTTP-2 · PROG-CGI-2</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">SEC-MEMORY-2's "cleanup attribute" alternative is not KNF</span></div>
+    <p>SEC-MEMORY-2 offers <code>__attribute__((cleanup))</code> as an alternative to the
+    goto-out discipline. The attribute is a GNU extension that OpenBSD base code does not use,
+    and <code>style(9)</code> does not sanction it. The alternative contradicts D-07's KNF
+    mandate in the same sentence that invokes style(9).</p>
+    <p class="fix"><b>Fix</b> Delete "or a cleanup attribute". Require the single goto-out
+    discipline.</p>
+    <div class="refs">SEC-MEMORY-2 · D-07</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">No key rotation or compromise procedure exists</span></div>
+    <p>The spec covers key loss but is silent on rotation and compromise. All storage keys
+    derive from the static key <code>d</code>, so a new key orphans every enrolled record and
+    forces every client to re-enroll. The spec never states this consequence.</p>
+    <p class="fix"><b>Fix</b> Add one rule to deployment.md: rotation is not supported in place.
+    On suspected compromise: generate a new key, clear pins/, re-provision the public key, and
+    have every client set_pin again.</p>
+    <div class="refs">DEPLOY-BACKUP-1 · DEPLOY-BACKUP-3 · STORE-KEYS-1</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The PLIST omits the /var/www/fuguoracle parent directory</span></div>
+    <p>PKG-ORACLE-3 creates only <code>/var/www/fuguoracle/pins/</code>. No rule creates the
+    parent directory that holds both pins/ and the keygen-written private.key. The base mtree
+    ships no such directory, so the package must create and list it, with an owner and mode the
+    _fuguoracle CGI can traverse.</p>
+    <p class="fix"><b>Fix</b> Extend PKG-ORACLE-3: the PLIST also creates
+    <code>/var/www/fuguoracle/</code> with a stated owner and mode (for example 0710
+    root:_fuguoracle).</p>
+    <div class="refs">PKG-ORACLE-3 · PROG-KEYGEN-2</div>
+  </div>
+
+  <h2>Findings — security</h2>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">OPS-JUNK-2 indistinguishability is broken by conditional fsync'd writes (timing oracle)</span></div>
+    <p>OPS-JUNK-2 claims no observable property of the response distinguishes junk-path
+    failures. The mandated paths differ in disk I/O. A missing record, a bad hmac, or a replay
+    performs no write. A wrong PIN and the third-strike wipe perform a full record write, which
+    STORE-ATOMIC-3 turns into a double-fsync operation. Response time separates the paths, and
+    the spec mandates no mitigation. The spec's added durability amplifies a side channel that
+    upstream, which never calls fsync, has in smaller form.</p>
+    <p class="fix"><b>Fix</b> Qualify OPS-JUNK-2 to response content only and add an
+    accepted-risk statement for timing, or require an equivalent dummy fsync'd write on the
+    no-write paths.</p>
+    <div class="refs">OPS-JUNK-2 · OPS-GET-2 · OPS-GET-5 · STORE-ATOMIC-3 · D-10</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">The attempt counter has no rollback protection; a file restore resets the three-strike limit</span></div>
+    <p>The security of the scheme rests on the integrity of the attempt counter. The counter
+    lives inside the record, and the record authenticator is a static function of the key
+    <code>d</code> and the filename. An old copy of a record file stays valid forever. A restore
+    or snapshot silently resets the counter and reopens PIN attempts, and the server cannot
+    detect it. The threat model never mentions this, and the backup guidance invites the exact
+    restore that causes it. Upstream shares the weakness; the spec does not state it as an
+    accepted risk.</p>
+    <p class="fix"><b>Fix</b> Add an explicit risk row: the attempt counter has no rollback
+    resistance against filesystem restore. State it as inherited and accepted, or specify an
+    external monotonic anchor.</p>
+    <div class="refs">OVR-PURPOSE · STORE-KEYS · SEC-THREAT · DEPLOY-BACKUP-2</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">Unbounded record creation via set_pin enables a disk-fill DoS inside the chroot</span></div>
+    <p>Any caller who speaks the protocol can mint fresh keypairs and create unlimited 129-byte
+    records. No quota, cap, or eviction exists in the spec or upstream. A full pins/ directory
+    breaks record writes and can starve the shared /var/www filesystem. Unauthenticated set_pin
+    is inherent to the wire protocol, so the remedy is operational.</p>
+    <p class="fix"><b>Fix</b> Add an operational note to deployment.md: place pins/ on a
+    dedicated partition or quota and monitor it. Mark the risk as inherited from upstream.</p>
+    <div class="refs">OPS-SET-4 · D-05 · OVR-RISKS</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">OPS-SET-4's replay-counter reset to 0 reopens a replay window (forced-wipe DoS)</span></div>
+    <p>set_pin persists replay_counter = 0, exactly as upstream does. The Jade counter only
+    increments and is never reset. After every PIN change, previously captured wrong-PIN
+    get_pin envelopes replay successfully in increasing counter order. Three replays burn the
+    attempts and force a wipe of the key share. Exploitation needs transport compromise plus
+    captured envelopes, and the behavior is mandatory under D-12, so only documentation can
+    change.</p>
+    <p class="fix"><b>Fix</b> Document the replay-reset window as an accepted, upstream-inherited
+    property: anti-replay protects only between PIN changes.</p>
+    <div class="refs">OPS-SET-4 · OPS-GET-2 · OPS-WIPE-1</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">A fresh random IV per storage write is not explicitly required</span></div>
+    <p>The record format carries a 16-byte IV, but no storage rule requires a fresh IV on every
+    write. The storage key is fixed per record, and the record is rewritten on every attempt. A
+    reused IV would reveal, to a disk observer, whether the PIN hash changed. PROTO-CRYPTO-4
+    states the freshness rule for the envelope path; storage has no equivalent.</p>
+    <p class="fix"><b>Fix</b> Add a storage rule: every record write draws a fresh IV from
+    <code>arc4random_buf(3)</code>.</p>
+    <div class="refs">STORE-RECORD · SEC-RANDOM-1 — lib.py:8–11</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">No rule disables core dumps; a crash can spill live secrets</span></div>
+    <p>SEC-MEMORY clears secrets on exit paths but never requires disabling core dumps. The
+    process holds the tweaked key, ECDH shared secrets, derived keys, and PIN plaintext in
+    memory. The mandated hand-written parsers run before those secrets clear. A crash can write
+    them to a core file inside the writable chroot.</p>
+    <p class="fix"><b>Fix</b> Add a SEC-MEMORY rule: set RLIMIT_CORE to 0 at startup, before the
+    program reads any request.</p>
+    <div class="refs">SEC-MEMORY-1 · SEC-MEMORY-2 · PROTO-HTTP-7</div>
+  </div>
+
+  <h2>Findings — client compatibility</h2>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">The "client keypair derives from the PIN" claim is wrong, and a client built to it loses all brute-force protection</span>
+      <span class="tag">Supplemental</span></div>
+    <p>clients.md says a conforming client "derives a client keypair from the PIN and its own
+    device secrets". protocol.md repeats the claim. The Jade keypair is a persisted,
+    PIN-independent device key (<code>storage_get_pin_privatekey</code>, generated once). Only
+    <code>pin_secret</code> mixes in the PIN (<code>HMAC(HMAC(pin_privkey, 0x00), pin)</code>).
+    The distinction is load-bearing. A wrong PIN must recover the same public key, so the guess
+    lands on the same record and burns the counter. A client whose keypair depends on the PIN
+    would address a different, missing record on every wrong guess. Each guess would return
+    junk, no counter would increment, and the oracle would grant unlimited online guesses. The
+    spec text prescribes a client design that voids the scheme's core property.</p>
+    <p class="fix"><b>Fix</b> Correct both passages: the client keypair derives from device
+    secrets only, and it must not depend on the PIN. The PIN enters <code>pin_secret</code>
+    alone. State why: a wrong PIN must address the same record.</p>
+    <div class="refs">CLIENT-MODEL · PROTO-PAYLOAD (prose) — pinclient.c:129–139, 350–370. Found in direct review; verified against the firmware source.</div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-head"><span class="sev">Medium</span>
+      <span class="finding-title">clients.md omits that an initialized Jade refuses an oracle public-key change</span></div>
+    <p>A Jade with a persisted wallet rejects any update_pinserver call that changes the
+    effective oracle public key. The firmware answers "Cannot update initialized unit". Only URL
+    and certificate changes are allowed on an initialized unit. clients.md states no ordering
+    constraint. An operator who migrates initialized Jades per the spec hits a hard, unexplained
+    failure.</p>
+    <p class="fix"><b>Fix</b> State in clients.md: the Jade accepts a new oracle public key only
+    while no wallet or PIN is persisted. Provision before initial wallet setup, or factory-reset
+    first.</p>
+    <div class="refs">CLIENT-JADE-2 · CLIENT-PROVISION-1 — update_pinserver.c</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">clients.md omits TLS root-certificate provisioning for a custom oracle</span></div>
+    <p>Jade's update_pinserver accepts an optional TLS root certificate, which the companion app
+    uses to verify the oracle endpoint. CLIENT-PROVISION-1 lists only the URL and the static
+    public key. The omission bites only private-CA deployments.</p>
+    <p class="fix"><b>Fix</b> Add the optional "certificate" parameter to CLIENT-PROVISION, with
+    a note for private-CA deployments.</p>
+    <div class="refs">CLIENT-PROVISION-1 · CLIENT-JADE-2</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The TLS-required claim is wrong for the client; the second URL (urlB, onion) is undocumented</span></div>
+    <p>CLIENT-PROVISION-2 says TLS is required because the companion app performs the HTTPS
+    call. The client accepts plain http:// URLs, and its default second URL is a plain-HTTP
+    onion address. The Jade emits two URLs (urlA and urlB) to the companion app, and clients.md
+    never mentions the second URL. TLS is a FuguOracle deployment property, not a client or
+    protocol requirement.</p>
+    <p class="fix"><b>Fix</b> Attribute TLS to DEPLOY-HTTPD. Document the optional second URL
+    and the companion app's URL selection.</p>
+    <div class="refs">CLIENT-PROVISION-2 · CLIENT-JADE-2 · DEPLOY-HTTPD</div>
+  </div>
+
+  <div class="finding lo">
+    <div class="finding-head"><span class="sev">Low</span>
+      <span class="finding-title">The client-appended /get_pin and /set_pin suffixes and the no-trailing-slash rule are unstated</span></div>
+    <p>Jade builds each request URL as base plus "/" plus the document name. A provisioned URL
+    with a trailing slash yields "//get_pin". The deployment httpd configuration blocks every
+    path except the three exact locations. The user then sees only a retryable network-error
+    prompt with no cause.</p>
+    <p class="fix"><b>Fix</b> Add a rule to CLIENT-PROVISION: the oracle URL must not end with
+    "/". The client appends "/get_pin" and "/set_pin". Cross-reference from PROTO-HTTP.</p>
+    <div class="refs">CLIENT-PROVISION-1 · PROTO-HTTP · DEPLOY-HTTPD-1</div>
+  </div>
+
+  <h2>Coverage gaps</h2>
+  <p>The review did not decide everything. These points stay open:</p>
+  <ul>
+    <li>The junk-path timing distinguisher was established analytically. No dimension measured
+      actual response-time separability.</li>
+    <li>Companion-app behavior beyond jadepy was not examined: Green/gdk URL selection between
+      urlA and urlB, retry policy, and TLS trust-store behavior.</li>
+    <li>Concurrency under the single global lock (contention, lock-holder crash recovery) was
+      not probed.</li>
+    <li>Storage comparisons used upstream's FileStorage backend only, not the Redis variant.</li>
+    <li>What an older, v1-speaking Jade firmware observes against a v2-only server was not
+      examined.</li>
+    <li>ASD-STE100 compliance was audited by sampling, not by a full lint.</li>
+  </ul>
+
+  <h2>Method</h2>
+  <p>A 13-agent workflow reviewed the specification from six independent dimensions: server
+  crypto compatibility, server behavior and storage, Jade client compatibility, adversarial
+  security, OpenBSD fit and simplicity, and internal consistency. An adversarial verifier
+  re-derived every finding from primary sources and tried to refute it. No finding was refuted;
+  duplicates across dimensions were merged. Verification included empirical execution of
+  wallycore 1.5.6 and an independent re-implementation of the envelope crypto. One supplemental
+  finding (the client-keypair derivation claim) came from a direct manual review of
+  <code>pinclient.c</code> and is marked as such.</p>
+
+  <div class="note">The five high-severity findings need a decision change (D-10, D-12), so
+  CLAUDE.md requires human approval before any plan can implement the fixes. The suggested
+  scope: junk responses on <code>get_pin</code> only; explicit 500s for <code>set_pin</code>
+  and pre-extraction failures; acceptance scoped to decrypted wire bytes with a specified
+  harness and draw order; a corrected keygen pledge set.</div>
+
+  <div class="foot">
+    FuguOracle spec 9a7f70d · blind_pin_server 2260709 · Jade 5ad8566 · libwally-core 3bf543c<br>
+    13 agents · 6 dimensions · adversarial verification · 34 confirmed findings · 0 refuted
+  </div>
+</div>
