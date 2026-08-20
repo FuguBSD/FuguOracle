@@ -52,3 +52,9 @@ BUILD_DEPENDS = security/libsecp256k1
   network access.
 - **PKG-ORACLE-5** — The port must declare `security/libsecp256k1` as a build
   dependency only. The static link leaves no `WANTLIB` beyond base.
+- **PKG-ORACLE-6** — The developer must build both ports on OpenBSD, and must run
+  each test target there. The `fuguvm` tool can supply the guest. The developer must use
+  `fuguvm` as a command only. A port must not depend on `fuguvm`.
+- **PKG-ORACLE-7** — The developer must verify both ports on OpenBSD/amd64 and on
+  OpenBSD/arm64. The static link of [PKG-ORACLE-5](packaging.md#pkg-oracle) and
+  [ARCH-STACK-3](architecture.md#arch-stack) must hold on each architecture.

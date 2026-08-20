@@ -34,6 +34,8 @@
 
 A development-only harness, not packaged, points the upstream repository's `client.py`
 and test suite at a local `httpd(8)` + `slowcgi(8)` + FuguOracle stack.
+The harness runs `client.py` in the OpenBSD guest, because the `fuguvm` tool forwards
+the guest SSH port only.
 
 - **TEST-INTEROP-1** — The harness must pass: a set/get roundtrip; a wrong PIN twice,
   then the correct PIN; a wrong PIN three times, then the wipe, then junk-key
@@ -46,6 +48,21 @@ and test suite at a local `httpd(8)` + `slowcgi(8)` + FuguOracle stack.
 - **TEST-INTEROP-3** — The harness must assert the status of every failure class in
   the failure table of [PROTO-HTTP](protocol.md#proto-http) that the harness can
   construct.
+- **TEST-INTEROP-4** — The harness must run the stack in an OpenBSD guest, and must
+  build the guest with the `fuguvm` tool. The harness must call `fuguvm up`, then
+  `fuguvm wait`, then one `fuguvm ssh` call for each step. The harness must use
+  `fuguvm` as a command only, and must not load an `App::FuguVM` module.
+- **TEST-INTEROP-5** — The harness must read the exit code of each `fuguvm` call.
+  Exit code 11 reports an absent snapshot, and the harness must then install the guest
+  again. Exit code 5 reports a running guest. The harness must stop the guest before it
+  saves or restores a snapshot. Exit code 7 reports a timeout.
+- **TEST-INTEROP-6** — The developer must run the harness on a private host. Each
+  forwarded guest port must otherwise bind to the loopback address. The guest permits a
+  root login with a generated password.
+- **TEST-INTEROP-7** — The harness must copy the source tree and the upstream
+  checkout into the guest with `fuguvm put`. It must copy the `httpd.conf` fragment and
+  the rc.d script in the same way. The harness must copy the test report out of the
+  guest with `fuguvm get`.
 
 <a id="test-fuzz"></a>
 
@@ -55,6 +72,19 @@ and test suite at a local `httpd(8)` + `slowcgi(8)` + FuguOracle stack.
   well-formed JSON body and must run every mutation against FuguOracle and against the
   upstream server. It must assert the same decision from both: reject (an HTTP error
   status), a junk key, or a real key.
+- **TEST-FUZZ-2** — The fuzzer is a development-only Perl program on the Fugu
+  library. The fuzzer must not enter the port.
+- **TEST-FUZZ-3** — The fuzzer must start each server with
+  `Fugu::Process->spawn_command`, and must stop each server with
+  `Fugu::Process->terminate`. It must run each mutation with `Fugu::Process->run` and a
+  `timeout`. It must draw each mutation with `Fugu::Random->random_bytes`. It must write
+  each failing case with `Fugu::File->write_atomic`. It must stop early on a signal: it
+  must build one `Fugu::Signal` manager, must call `setup_interrupt_flag` on that
+  manager, and must read the flag between two mutations.
+- **TEST-FUZZ-4** — The fuzzer must call the CGI program directly for the FuguOracle
+  side. It must set the request variables of [PROG-CGI-1](programs.md#prog-cgi) and
+  [PROG-CGI-2](programs.md#prog-cgi) in the environment of each child. It must pass the
+  mutated body on standard input.
 
 <a id="test-live"></a>
 
@@ -76,6 +106,9 @@ and test suite at a local `httpd(8)` + `slowcgi(8)` + FuguOracle stack.
   source into the upstream `os.urandom` (see D-12).
 - **TEST-ACCEPT-2** — The service must draw random bytes in the upstream order of the
   draw table below, so that fixed-source outputs align.
+- **TEST-ACCEPT-3** — The harness must keep the fixed random source as one committed
+  file. It must give the same file to both servers. It must set the environment of each
+  child with `Fugu::Process`. It must compare the two `200` bodies byte for byte.
 
 | Operation and path | Draws, in order |
 | --- | --- |
