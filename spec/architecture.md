@@ -34,6 +34,12 @@
   inside the `/var/www` chroot, where no shared libraries are present.
 - **ARCH-STACK-4** — The service must run one process per request, and it must hold no
   state between requests other than the PIN record files.
+- **ARCH-STACK-5** — A developer must verify the stack on OpenBSD. The `fuguvm` tool
+  supplies the OpenBSD guest. `fuguvm up` starts the guest, and `fuguvm ssh` runs each
+  check in the guest. The tool forwards the guest SSH port only, so each check must run
+  in the guest. `fuguvm snapshot save` records a provisioned guest, and
+  `fuguvm snapshot restore` returns to it. The guest holds a test key only, because it
+  permits a root login.
 
 One process per request is a feature: each request gets a fresh address space, and
 secrets live for milliseconds.
@@ -66,6 +72,10 @@ From ports: `security/libsecp256k1`, a new companion port that this project deli
   own code.
 - **ARCH-DEPS-4** — The build must consume `libsecp256k1` as a build dependency and
   must link the static archive.
+- **ARCH-DEPS-5** — The build and the regression tests run in the OpenBSD guest of
+  [ARCH-STACK](architecture.md#arch-stack). `fuguvm put` copies the source tree and the
+  port files into the guest. The guest keeps the `comp` set, so it compiles the static
+  program. The service needs no virtual machine of its own.
 
 `libsecp256k1` is the reference implementation that the upstream server uses, through
 libwally.
