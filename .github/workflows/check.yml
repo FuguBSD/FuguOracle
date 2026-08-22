@@ -1,0 +1,50 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check
+        run: make check
+
+      - name: Drift gate
+        if: github.event_name == 'pull_request'
+        run: scripts/spec-check --drift "origin/${{ github.base_ref }}"
+
+  sync:
+    name: Sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout FuguBSD/Tooling
+        uses: actions/checkout@v4
+        with:
+          repository: FuguBSD/Tooling
+          path: tooling
+
+      # The synced copies must match FuguBSD/Tooling exactly.
+      - name: Verify the synced copies
+        run: ./tooling/scripts/sync --check
+
+  prettier:
+    name: Prettier
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Markdown, JSON and YAML formatting
+        run: make prettier
