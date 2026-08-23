@@ -25,7 +25,7 @@ live in `docs/research/`.
 ```sh
 make check       # spec-check + ste-lint + test
 make spec-check  # validate the specification and the plans
-make prettier    # Markdown formatting check
+make format-md   # Markdown formatting check
 ```
 
 ## Commit scopes
