@@ -1,0 +1,18 @@
+# The website, built by fuguweb(1).
+
+site = FuguOracle
+
+nav "index.html" {
+	label = Home
+}
+
+page "index.html" {
+	title = Home
+	body  = index.body.html
+}
+
+page "404.html" {
+	title    = Not found
+	body     = 404.body.html
+	unlinked = yes
+}
