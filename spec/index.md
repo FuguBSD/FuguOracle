@@ -1,6 +1,6 @@
 # FuguOracle specification
 
-FuguOracle is a blind PIN oracle. It acts as a virtual secure element for client
+FuguOracle is a blind PIN oracle. It is a virtual secure element for client
 devices and client programs. A client holds a secret in encrypted form, under a
 key that the client alone cannot rebuild. The oracle holds a key share for each
 client, and it releases the share only for a request that proves the correct

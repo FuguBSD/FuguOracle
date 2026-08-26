@@ -2,7 +2,7 @@
 
 A blind PIN oracle service, designed after OpenBSD principles.
 
-FuguOracle acts as a virtual secure element for client devices and client
+FuguOracle is a virtual secure element for client devices and client
 programs. A client holds a secret in encrypted form, under a key that the client
 alone cannot rebuild. The oracle holds a key share for each client, and it
 releases the share only for a request that proves the correct PIN. The oracle

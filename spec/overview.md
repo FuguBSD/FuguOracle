@@ -4,7 +4,7 @@
 
 ## Purpose
 
-FuguOracle is a blind PIN oracle, written in C for OpenBSD. The oracle acts as a
+FuguOracle is a blind PIN oracle, written in C for OpenBSD. The oracle is a
 virtual secure element: it supplies the anti-brute-force property that a
 hardware secure element gives, as a network service.
 

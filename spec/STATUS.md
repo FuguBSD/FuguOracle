@@ -15,9 +15,9 @@ reference to an earlier state. A note can carry the date of a recorded fact.
 | done    | Code implements the full unit. The note links the code or the tests. |
 | n-a     | No code can implement the unit. It exists for citation only.         |
 
-The “Done by” column names a phase of the [roadmap](ROADMAP.md). At the exit of
+The "Done by" column names a phase of the [roadmap](ROADMAP.md). At the exit of
 that phase, the unit must have the state `done`. A unit can reach `done` before
-that phase. An `n-a` unit has no “Done by” value.
+that phase. An `n-a` unit has no "Done by" value.
 
 ## Units
 

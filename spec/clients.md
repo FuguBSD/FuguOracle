@@ -23,8 +23,8 @@ conforming client:
   tweaked server key from the provisioned static public key, so the envelope MAC
   fails against an impostor.
 
-One oracle instance serves many clients: each record is addressed by the hash of
-the client's recovered public key.
+One oracle instance serves many clients: the hash of the client's recovered
+public key addresses each record.
 
 <a id="client-provision"></a>
 
