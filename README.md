@@ -24,8 +24,10 @@ is the authoritative reference. Research notes live in `docs/research/`.
 ```sh
 make check       # spec-check + ste-lint + test
 make spec-check  # validate the specification and the plans
-make format-md   # Markdown formatting check
 ```
+
+`make check` runs the Markdown format gate, and prettier runs through bunx. The
+operator installs bun, for example from Homebrew. No deps manifest provides it.
 
 ## Commit scopes
 

@@ -15,6 +15,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The format gate runs prettier through bunx.
+      - name: Setup bun
+        uses: FuguBSD/Tooling/actions/setup-bun@main
+
       - name: Check
         run: make check
 
@@ -38,16 +42,3 @@ jobs:
       # The synced copies must match FuguBSD/Tooling exactly.
       - name: Verify the synced copies
         run: ./tooling/scripts/sync --check
-
-  format-md:
-    name: Format MD
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup bun
-        uses: FuguBSD/Tooling/actions/setup-bun@main
-
-      - name: Check Markdown, JSON and YAML formatting
-        run: make format-md
