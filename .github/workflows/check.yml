@@ -46,5 +46,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup bun
+        uses: FuguBSD/Tooling/actions/setup-bun@main
+
       - name: Check Markdown, JSON and YAML formatting
         run: make format-md
