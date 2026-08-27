@@ -11,6 +11,9 @@ on:
       - ".fuguwebrc"
       - "web/**"
       - ".github/workflows/publish.yml"
+  # A manual run publishes the site again, for example after a change
+  # to the shared workflow.
+  workflow_dispatch:
 
 permissions:
   contents: read
