@@ -22,12 +22,13 @@ is the authoritative reference. Research notes live in `docs/research/`.
 ## Commands
 
 ```sh
-make check       # spec-check + ste-lint + test
+make check       # spec-check + ste-lint + gitleaks + test
 make spec-check  # validate the specification and the plans
 ```
 
 `make check` runs the Markdown format gate, and prettier runs through bunx. The
-operator installs bun, for example from Homebrew. No deps manifest provides it.
+operator installs bun and gitleaks, for example from Homebrew. No deps manifest
+provides them.
 
 ## Commit scopes
 

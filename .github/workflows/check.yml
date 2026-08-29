@@ -19,6 +19,11 @@ jobs:
       - name: Setup bun
         uses: FuguBSD/Tooling/actions/setup-bun@main
 
+      # The gitleaks gate scans the full git history, so the
+      # checkout above stays at fetch-depth 0 (WFL-GITLEAKS-2).
+      - name: Setup gitleaks
+        uses: FuguBSD/Tooling/actions/setup-gitleaks@main
+
       - name: Check
         run: make check
 
