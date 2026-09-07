@@ -27,8 +27,17 @@ make spec-check  # validate the specification and the plans
 ```
 
 `make check` runs the Markdown format gate, and prettier runs through bunx. The
-operator installs bun and gitleaks, for example from Homebrew. No deps manifest
-provides them.
+operator installs bun, for example from Homebrew. The manifest does not provide
+it, because the format gate needs `bunx` before a target can run.
+
+    make deps        # install the external tools of the repository
+
+`make deps` installs gitleaks, the tool of the secret gate, from the manifest of
+the platform in `deps/`. It installs the `tool` environment before every other
+environment, so the gate tool is present for each chain. `deps/SHA256.txt`
+records the sha256 digest of each versioned download, and `make deps` compares
+the downloaded bytes against it. The CI gate installs gitleaks the same way, so
+one pin serves the operator gate and the CI gate.
 
 ## Commit scopes
 
