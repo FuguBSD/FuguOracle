@@ -18,7 +18,3 @@ make check       # run every gate; run it before each commit
 make test        # run the test suite
 make format-fix  # fix the Markdown, JSON and YAML formatting
 ```
-
-## Commit scopes
-
-`spec`, `docs`, `ci`.
