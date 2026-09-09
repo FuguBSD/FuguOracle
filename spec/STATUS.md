@@ -66,8 +66,8 @@ that phase. An `n-a` unit has no "Done by" value.
 
 ## Update protocol
 
-1. The change that implements a unit, or a part of a unit, sets the state of the
-   unit in this register, in the same change.
+1. The change that implements a unit, or a part of one, sets the unit state in
+   this register in the same change.
 2. A `partial` note names each absent rule or part. For each absent part, the
    note names the unit that the part needs.
 3. A `done` note holds at least one relative link to code or to tests.

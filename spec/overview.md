@@ -38,9 +38,10 @@ Goals:
 - Use the OpenBSD base system for everything except secp256k1 arithmetic.
 - Do not reimplement cryptography. All primitives come from LibreSSL `libcrypto`
   (base) and `libsecp256k1` (port).
-- Follow idiomatic OpenBSD design: `httpd(8)`, `slowcgi(8)`, a statically linked
-  CGI program, `pledge(2)`, `unveil(2)`, `arc4random(3)`, `syslog(3)`, `mdoc(7)`
-  man pages, an rc.d script, and a clean ports-tree package.
+- Follow idiomatic OpenBSD design. The design uses `httpd(8)`, `slowcgi(8)`, a
+  statically linked CGI program, `pledge(2)`, `unveil(2)`, `arc4random(3)`, and
+  `syslog(3)`. It also uses `mdoc(7)` man pages, an rc.d script, and a clean
+  ports-tree package.
 
 Non-goals, as deviations from the upstream server:
 

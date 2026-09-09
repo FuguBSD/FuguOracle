@@ -23,21 +23,22 @@ the provisioned URL (see [CLIENT-PROVISION](clients.md#client-provision)).
   status `413`.
 - **PROTO-HTTP-3** — The service must reject malformed JSON, bad base64, and a
   length violation with status `400`.
-- **PROTO-HTTP-4** — The service must answer these failures with status `500`:
-  an envelope failure (a bad MAC, a decrypt error, or bad padding), a payload
-  extraction failure (see [PROTO-PAYLOAD-5](protocol.md#proto-payload)), a
-  `set_pin` failure after payload extraction, and an I/O failure.
+- **PROTO-HTTP-4** — The service must answer these failures with status `500`.
+  An envelope failure has a bad MAC, a decrypt error, or bad padding. The other
+  failures are a payload extraction failure (see
+  [PROTO-PAYLOAD-5](protocol.md#proto-payload)), a `set_pin` failure after
+  payload extraction, and an I/O failure.
 - **PROTO-HTTP-5** — The service must answer an unknown path with `404` and a
   wrong method with `405`.
 - **PROTO-HTTP-6** — The service must set the response header
   `Content-Type: application/json` on every `200` response to a `POST` request.
   Error responses and the liveness response must carry an empty body.
-- **PROTO-HTTP-7** — The JSON reader must accept only one request shape: an
-  object with a `data` member whose value is a base64 string without escape
-  sequences. A small linear scanner extracts the member. The scanner must ignore
-  unknown members, must accept insignificant JSON whitespace, and must treat a
-  duplicate `data` member or any other shape as malformed JSON. The service must
-  not use a JSON library.
+- **PROTO-HTTP-7** — The JSON reader must accept only one request shape. The
+  shape is an object with a `data` member whose value is a base64 string without
+  escape sequences. A small linear scanner extracts the member. The scanner must
+  ignore unknown members, and must accept insignificant JSON whitespace. It must
+  treat a duplicate `data` member or any other shape as malformed JSON. The
+  service must not use a JSON library.
 - **PROTO-HTTP-8** — HTTP error statuses answer every failure up to and through
   payload extraction, every `set_pin` failure, and every I/O failure. After
   payload extraction succeeds, [OPS-JUNK](operations.md#ops-junk) governs every
@@ -177,16 +178,16 @@ set_pin:  pin_secret(32) ‖ entropy(32) ‖ sig(65)      = 129 bytes (entropy r
 
 - **PROTO-PAYLOAD-1** — The service must reject every other payload length.
 - **PROTO-PAYLOAD-2** — `sig` is a recoverable ECDSA signature of 65 bytes, in
-  the libwally format: `sig[0]` is a header byte with
+  the libwally format. `sig[0]` is a header byte with
   `recid = (sig[0] - 27) & 3`, and `sig[1..64]` is the compact `r ‖ s`.
 - **PROTO-PAYLOAD-3** — The signed message is
   `H( cke ‖ replay_counter ‖ pin_secret ‖ entropy )`. For the 97-byte form,
   `entropy` is empty.
 - **PROTO-PAYLOAD-4** — The service must recover the client public key from the
-  signature: parse with
+  signature. It must parse with
   `secp256k1_ecdsa_recoverable_signature_parse_compact(&rsig, sig+1, recid)`,
-  recover with `secp256k1_ecdsa_recover(&pin_pubkey, &rsig, msghash)`, then
-  serialize `pin_pubkey` as SEC1 compressed (33 bytes).
+  and recover with `secp256k1_ecdsa_recover(&pin_pubkey, &rsig, msghash)`. It
+  must then serialize `pin_pubkey` as SEC1 compressed (33 bytes).
 - **PROTO-PAYLOAD-5** — A payload length violation and a signature recovery
   failure are internal failures (`500`), on both endpoints. The junk path needs
   `pin_secret` and the recovered key, so it cannot answer these failures.
@@ -195,7 +196,7 @@ The recovered key never travels on the wire. The client holds the matching
 private key independent of the PIN, and possession of that key is the client's
 identity. The client mixes the PIN into `pin_secret` only (see
 [CLIENT-MODEL](clients.md#client-model)). A wrong PIN yields the same recovered
-public key and a different `pin_secret`: the request addresses the same record,
+public key and a different `pin_secret`. The request addresses the same record,
 and the wrong guess burns one attempt. The hash of the recovered key addresses
 the PIN record (see [STORE-KEYS](storage.md#store-keys)).
 

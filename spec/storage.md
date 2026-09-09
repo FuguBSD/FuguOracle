@@ -19,9 +19,9 @@ pin_auth_key     = HMAC(aes_pin_data_key, pin_pubkey_hash)
 
 - **STORE-KEYS-1** — The service must derive the storage keys exactly as above.
 - **STORE-KEYS-2** — The service must not store `pin_pubkey`. The record
-  encryption key derives from it, so an attacker with the disk, and even with
-  the static key `d`, cannot read a record without a client request that
-  supplies the key.
+  encryption key derives from it. An attacker with the disk cannot read a record
+  without a client request that supplies the key. This holds even with the
+  static key `d`.
 - **STORE-KEYS-3** — The record file name must be the lowercase hex of
   `pin_pubkey_hash`, with the suffix `.pin`, inside `PINS_DIR`.
 
@@ -67,9 +67,10 @@ The record plaintext has 69 bytes, padded with PKCS#7 to 80 bytes:
   load, decide, and store steps of a request:
   `open(PINS_DIR "/.lock", O_RDWR|O_CREAT|O_EXLOCK)`.
 - **STORE-ATOMIC-2** — The service must not use per-record locks.
-- **STORE-ATOMIC-3** — A write that creates or updates a record must be atomic:
-  `mkstemp(3)` in `PINS_DIR`, write the 129 bytes, `fsync(2)`, `rename(2)` over
-  the target, then `fsync` the directory file descriptor. A crashed request must
-  not leave a torn record. The third-strike wipe is the one exception: it
-  overwrites the record in place ([OPS-WIPE-1](operations.md#ops-wipe)), because
-  the wipe targets the existing blocks.
+- **STORE-ATOMIC-3** — A write that creates or updates a record must be atomic.
+  The steps are `mkstemp(3)` in `PINS_DIR`, write the 129 bytes, `fsync(2)`,
+  `rename(2)` over the target, then `fsync` the directory file descriptor. A
+  crashed request must not leave a torn record. The third-strike wipe is the one
+  exception: it overwrites the record in place
+  ([OPS-WIPE-1](operations.md#ops-wipe)), because the wipe targets the existing
+  blocks.

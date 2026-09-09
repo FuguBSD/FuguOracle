@@ -19,7 +19,7 @@ conforming client:
   address a missing record on every wrong guess, and the attempt counter would
   never move.
 - Enrolls with `set_pin` and unlocks with `get_pin`.
-- Authenticates the oracle cryptographically: the client computes the expected
+- Authenticates the oracle cryptographically. The client computes the expected
   tweaked server key from the provisioned static public key, so the envelope MAC
   fails against an impostor.
 
@@ -30,11 +30,11 @@ public key addresses each record.
 
 ## Provisioning
 
-- **CLIENT-PROVISION-1** — The operator must give each client two values: the
-  oracle URL, for example `https://oracle.example.org`, and the static public
-  key, as the hex string that `fuguoracle-keygen` prints. The URL must not end
-  with a slash: the client appends `/get_pin` and `/set_pin` to it (see
-  [PROTO-HTTP](protocol.md#proto-http)).
+- **CLIENT-PROVISION-1** — The operator must give each client two values. The
+  first is the oracle URL, for example `https://oracle.example.org`. The second
+  is the static public key, as the hex string that `fuguoracle-keygen` prints.
+  The URL must not end with a slash: the client appends `/get_pin` and
+  `/set_pin` to it (see [PROTO-HTTP](protocol.md#proto-http)).
 - **CLIENT-PROVISION-2** — The deployment terminates TLS
   ([DEPLOY-HTTPD](deployment.md#deploy-httpd)). The client does not require TLS:
   the envelope authenticates the oracle, and TLS protects metadata and
@@ -55,14 +55,14 @@ change, and `get_pin` on every unlock.
 ## Blockstream Jade, the reference client
 
 The Blockstream Jade hardware wallet is the reference client. The Jade holds a
-wallet secret encrypted under a key that it does not store, and it relays oracle
+wallet secret encrypted under a key that it does not store. It relays oracle
 calls through the companion app (Green app or gdk) over USB, BLE, or QR.
 
 - **CLIENT-JADE-1** — The service must serve the current Jade firmware, which
   speaks protocol v2.
 - **CLIENT-JADE-2** — The operator provisions a Jade with the companion app or
-  the gdk `update_pinserver` call, and sets the oracle URL and the static public
-  key.
+  the gdk `update_pinserver` call. The operator sets the oracle URL and the
+  static public key.
 - **CLIENT-JADE-3** — An initialized Jade refuses a change of the oracle public
   key, with the message `Cannot update initialized unit`. The operator must
   provision the oracle before the first wallet setup, or must factory-reset the

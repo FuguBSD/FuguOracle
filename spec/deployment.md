@@ -45,8 +45,8 @@ server "oracle.example.org" {
   door. The CGI check per [PROG-CGI-2](programs.md#prog-cgi) stays in place
   behind it.
 
-The base defaults bound each request in time: `slowcgi(8)` ends a request after
-120 seconds and closes the program's standard input, output, and error, and
+The base defaults bound each request in time. `slowcgi(8)` ends a request after
+120 seconds, and it closes the program's standard input, output, and error.
 `httpd(8)` applies its own FastCGI timeouts. The defaults need no tuning.
 
 <a id="deploy-service"></a>
@@ -97,11 +97,11 @@ recover by that path.
 - **DEPLOY-BACKUP-3** — The man page and the pkg-readme must carry this backup
   warning.
 - **DEPLOY-BACKUP-4** — The operator must restore `pins/` only after an incident
-  review: a restore rewinds attempt counters and replay counters to the backup
+  review. A restore rewinds attempt counters and replay counters to the backup
   time (see the [risks](overview.md#ovr-risks)).
 - **DEPLOY-BACKUP-5** — Key rotation in place is not supported: every storage
   key derives from the static key, so a new key orphans every record. On a
-  suspected key compromise, the operator must generate a new key, must clear
-  `pins/`, must provision the new public key into every client, and must have
-  every client run `set_pin` again. The man page and the pkg-readme must carry
-  this procedure.
+  suspected key compromise, the operator must generate a new key and must clear
+  `pins/`. The operator must then provision the new public key into every
+  client, and must have every client run `set_pin` again. The man page and the
+  pkg-readme must carry this procedure.

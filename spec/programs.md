@@ -9,13 +9,13 @@
 
 - **PROG-CGI-1** — The program must dispatch on `REQUEST_METHOD` and
   `DOCUMENT_URI`. `httpd(8)` sets `DOCUMENT_URI` to the decoded request path,
-  independent of the filesystem; it splits `SCRIPT_NAME` and `PATH_INFO` against
+  independent of the filesystem. It splits `SCRIPT_NAME` and `PATH_INFO` against
   the document root on disk, so those variables do not carry the endpoint path.
   The accepted pairs are `GET /`, `POST /get_pin`, and `POST /set_pin`. Every
   other pair answers `404` or `405` per [PROTO-HTTP-5](protocol.md#proto-http).
 - **PROG-CGI-2** — The program must reject a `POST` request when
-  `CONTENT_LENGTH` is absent, is not a decimal number, or exceeds 4096, with the
-  statuses of [PROTO-HTTP-2](protocol.md#proto-http) and
+  `CONTENT_LENGTH` is absent, is not a decimal number, or exceeds 4096. The
+  statuses are in [PROTO-HTTP-2](protocol.md#proto-http) and
   [PROTO-HTTP-3](protocol.md#proto-http). The program must read exactly
   `CONTENT_LENGTH` bytes from stdin.
 - **PROG-CGI-3** — The program must emit the CGI response on stdout.

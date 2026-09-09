@@ -11,7 +11,7 @@ SHA-256. `HMAC(k, m)` is HMAC-SHA256.
 - **OPS-SET-1** — The service must require the 129-byte payload form: `entropy`
   is mandatory.
 - **OPS-SET-2** — If a record exists for `pin_pubkey_hash`, the service must
-  load it and must enforce anti-replay: the client counter must be strictly
+  load it and must enforce anti-replay. The client counter must be strictly
   greater than the stored counter. A missing record is normal. A replay
   violation and a corrupt record are internal failures (`500`).
 - **OPS-SET-3** — The service must compute
@@ -42,9 +42,9 @@ values. The [risk table](overview.md#ovr-risks) records this accepted property.
   forms and must ignore `entropy`.
 - **OPS-GET-2** — The service must load the record and must enforce anti-replay:
   the client counter must be strictly greater than the stored counter. A missing
-  record, a corrupt record (a wrong file length, a bad `hmac`, or a wrong
-  plaintext length), and a replay violation all take the junk path
-  ([OPS-JUNK](operations.md#ops-junk)).
+  record, a corrupt record, and a replay violation all take the junk path
+  ([OPS-JUNK](operations.md#ops-junk)). A corrupt record has a wrong file
+  length, a bad `hmac`, or a wrong plaintext length.
 - **OPS-GET-3** — The service must compare `H(pin_secret)` to the stored hash
   with `timingsafe_bcmp(3)`.
 - **OPS-GET-4** — On a correct PIN, the service must persist the record with
@@ -57,7 +57,7 @@ values. The [risk table](overview.md#ovr-risks) records this accepted property.
   must take the junk path.
 - **OPS-GET-7** — The service must persist a record change before it sends the
   response. An I/O failure on load, other than a missing record, and every
-  persist failure are internal failures (`500`): an attempt that the service
+  persist failure are internal failures (`500`). An attempt that the service
   cannot count must not receive an answer.
 
 <a id="ops-wipe"></a>
@@ -91,12 +91,12 @@ return HTTP error statuses (see [OPS-SET-7](operations.md#ops-set) and D-10).
 - **OPS-JUNK-1** — The service must respond with status `200` and a valid
   response envelope whose payload is `HMAC(key = random32, msg = pin_secret)`,
   with `random32` drawn fresh from `arc4random_buf(3)`.
-- **OPS-JUNK-2** — A caller must not be able to distinguish a wrong PIN from a
-  missing record, or from a replayed request, by the response bytes: the status,
-  the headers, and the envelope size must be identical on every junk path. The
-  only failure signal is the client's own decrypt failure. Response time can
-  differ between paths that write and paths that do not; the
-  [risk table](overview.md#ovr-risks) records this accepted risk. The design
-  depends on this property: preserve it exactly (see D-10).
+- **OPS-JUNK-2** — The response bytes must not distinguish a wrong PIN from a
+  missing record, or from a replayed request. The status, the headers, and the
+  envelope size must be identical on every junk path. The only failure signal is
+  the client's own decrypt failure. Response time can differ between paths that
+  write and paths that do not; the [risk table](overview.md#ovr-risks) records
+  this accepted risk. The design depends on this property: preserve it exactly
+  (see D-10).
 - **OPS-JUNK-3** — HTTP error statuses answer every failure class outside the
   junk path (see the failure table in [PROTO-HTTP](protocol.md#proto-http)).

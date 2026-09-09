@@ -4,11 +4,11 @@
 
 ## Known-answer tests
 
-- **TEST-KAT-1** — The `regress/` suite must hold a known-answer vector,
-  generated once from upstream libwally, for every crypto shim function: the
-  TapTweak derivation, the ECDH shared secret, the HMAC-SHA512 KDF split,
-  envelope encrypt and decrypt, public key recovery, and record encrypt and
-  decrypt.
+- **TEST-KAT-1** — The `regress/` suite must hold a known-answer vector for
+  every crypto shim function, generated once from upstream libwally. The
+  functions are the TapTweak derivation, the ECDH shared secret, and the
+  HMAC-SHA512 KDF split. The other functions are envelope encrypt and decrypt,
+  public key recovery, and record encrypt and decrypt.
 - **TEST-KAT-2** — The vectors are committed as hex. `make regress` must need no
   Python and no network.
 - **TEST-KAT-3** — The TapTweak vector must exist before any other code (see the
@@ -19,8 +19,8 @@
 ## Unit tests
 
 - **TEST-UNIT-1** — A unit test must run the third-strike wipe against a real
-  record file and must inspect the file content before the unlink: the stored
-  `hash_pin_secret`, `aes_key = 0³²`, `count = 3`, and
+  record file. It must inspect the file content before the unlink. The content
+  is the stored `hash_pin_secret`, `aes_key = 0³²`, `count = 3`, and
   `replay_counter = 0xFFFFFFFF`, in the 129-byte layout
   ([OPS-WIPE-1](operations.md#ops-wipe)).
 - **TEST-UNIT-2** — A unit test must prove write atomicity: a write that stops
@@ -39,13 +39,14 @@ A development-only harness, not packaged, points the upstream repository's
 stack. The harness runs `client.py` in the OpenBSD guest, because the `fuguvm`
 tool forwards the guest SSH port only.
 
-- **TEST-INTEROP-1** — The harness must pass: a set/get roundtrip; a wrong PIN
-  twice, then the correct PIN; a wrong PIN three times, then the wipe, then
-  junk-key responses; replay-counter rejection for a stale and for an equal
-  counter; and both the 97-byte and the 129-byte payload forms.
-- **TEST-INTEROP-2** — The harness must assert junk-response uniformity: for a
-  missing record, a corrupt record, a replay violation, and a wrong PIN, the
-  status, the headers, and the body length must be identical
+- **TEST-INTEROP-1** — The harness must pass a set/get roundtrip. It must pass a
+  wrong PIN twice, then the correct PIN. It must pass a wrong PIN three times,
+  then the wipe, then junk-key responses. It must pass replay-counter rejection
+  for a stale and for an equal counter. It must pass both the 97-byte and the
+  129-byte payload forms.
+- **TEST-INTEROP-2** — The harness must assert junk-response uniformity. The
+  junk paths are a missing record, a corrupt record, a replay violation, and a
+  wrong PIN. The status, the headers, and the body length must be identical
   ([OPS-JUNK-2](operations.md#ops-junk)).
 - **TEST-INTEROP-3** — The harness must assert the status of every failure class
   in the failure table of [PROTO-HTTP](protocol.md#proto-http) that the harness
@@ -73,7 +74,7 @@ tool forwards the guest SSH port only.
 ## Differential fuzzing
 
 - **TEST-FUZZ-1** — A development-only fuzzer must mutate the envelope bytes
-  inside a well-formed JSON body and must run every mutation against FuguOracle
+  inside a well-formed JSON body. It must run every mutation against FuguOracle
   and against the upstream server. It must assert the same decision from both:
   reject (an HTTP error status), a junk key, or a real key.
 - **TEST-FUZZ-2** — The fuzzer is a development-only Perl program on the Fugu
@@ -83,7 +84,7 @@ tool forwards the guest SSH port only.
   `Fugu::Process->terminate`. It must run each mutation with
   `Fugu::Process->run` and a `timeout`. It must draw each mutation with
   `Fugu::Random->random_bytes`. It must write each failing case with
-  `Fugu::File->write_atomic`. It must stop early on a signal: it must build one
+  `Fugu::File->write_atomic`. It must stop early on a signal. It must build one
   `Fugu::Signal` manager, must call `setup_interrupt_flag` on that manager, and
   must read the flag between two mutations.
 - **TEST-FUZZ-4** — The fuzzer must call the CGI program directly for the
@@ -97,17 +98,17 @@ tool forwards the guest SSH port only.
 ## Live client test
 
 - **TEST-LIVE-1** — Before any real use, the operator must provision a spare
-  reference client against the oracle and must pass a full cycle: set the PIN,
-  unlock, and the three-strike wipe.
+  reference client against the oracle. The operator must pass a full cycle: set
+  the PIN, unlock, and the three-strike wipe.
 
 <a id="test-accept"></a>
 
 ## Acceptance
 
 - **TEST-ACCEPT-1** — Acceptance is behavioral equality with the upstream server
-  for well-formed requests: the same reject, junk, or real decision, and
-  byte-identical `200` response bodies for identical input and identical stored
-  state. Test builds route every draw through the random seam
+  for well-formed requests. Both give the same reject, junk, or real decision.
+  Both give byte-identical `200` response bodies for identical input and
+  identical stored state. Test builds route every draw through the random seam
   ([SEC-RANDOM-2](security.md#sec-random)), and the harness patches the same
   fixed source into the upstream `os.urandom` (see D-12).
 - **TEST-ACCEPT-2** — The service must draw random bytes in the upstream order

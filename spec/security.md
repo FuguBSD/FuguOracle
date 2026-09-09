@@ -8,10 +8,10 @@ The assets are the static server key `d` and the per-record `aes_key` shares. An
 attacker who compromises `d`, and who has also stolen a client's flash contents,
 can brute-force the low-entropy PIN offline. The purpose of the oracle is to
 make that brute force require the server's cooperation, rate-limited to three
-attempts. The defenses follow from this: constant-time curve arithmetic
-(`libsecp256k1`), a minimal attack surface (a CGI program, no parser zoo), a key
-file that the web stack cannot read (owner `_fuguoracle`, mode `0400`), and
-sandbox confinement.
+attempts. The defenses follow from this. They are constant-time curve arithmetic
+(`libsecp256k1`), and a minimal attack surface (a CGI program, no parser zoo).
+The other defenses are a key file that the web stack cannot read (owner
+`_fuguoracle`, mode `0400`), and sandbox confinement.
 
 <a id="sec-sandbox"></a>
 
@@ -39,8 +39,8 @@ if (pledge("stdio rpath wpath cpath flock", NULL) == -1) err(1, "pledge");
 - **SEC-SANDBOX-3** — The program must unveil only the key path, read-only, and
   the records directory, read-write-create.
 - **SEC-SANDBOX-4** — The program must run inside the `/var/www` chroot, as the
-  user `_fuguoracle` (via `slowcgi -u`), so that the `httpd(8)` workers cannot
-  read the key file.
+  user `_fuguoracle` (via `slowcgi -u`). The `httpd(8)` workers then cannot read
+  the key file.
 
 <a id="sec-memory"></a>
 
@@ -74,7 +74,7 @@ if (pledge("stdio rpath wpath cpath flock", NULL) == -1) err(1, "pledge");
 
 - **SEC-LOGGING-1** — The program must log with
   `openlog("fuguoracle", LOG_PID, LOG_DAEMON)` and `syslog(3)`. OpenBSD
-  `syslog(3)` delivers messages with the `sendsyslog(2)` system call: it needs
+  `syslog(3)` delivers messages with the `sendsyslog(2)` system call. It needs
   no log socket, it works inside the chroot, and the `stdio` pledge promise
   covers it.
 - **SEC-LOGGING-2** — The program must log one line per request with the outcome

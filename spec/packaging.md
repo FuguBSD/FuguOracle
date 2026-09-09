@@ -42,7 +42,7 @@ BUILD_DEPENDS = security/libsecp256k1
   (static, `@mode 0555`), `/usr/local/sbin/fuguoracle-keygen`, the man pages,
   the rc.d script, and the pkg-readme.
 - **PKG-ORACLE-2** — The `pkg/PLIST` must create the user and the group with
-  `@newuser _fuguoracle` and `@newgroup`, with a uid from the ports user
+  `@newuser _fuguoracle` and `@newgroup`. The uid must come from the ports user
   registry for the official submission.
 - **PKG-ORACLE-3** — The `pkg/PLIST` must `@sample`-create
   `/var/www/fuguoracle/` with mode `0710` and owner `root:_fuguoracle`, and
