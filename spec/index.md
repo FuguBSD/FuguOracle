@@ -21,6 +21,8 @@ contract, the ID conventions, and the document tables.
   `Implements: OPS-GET, OPS-JUNK`.
 - A plan can exclude a rule from a cited unit with `without`, for example
   `Implements: OPS-GET without OPS-GET-6`.
+- A plan must cite each `done` unit that it extends, for example
+  `Extends: OPS-GET`.
 - A plan must cite each unit that it touches but defers, for example
   `Defers: STORE-ATOMIC`.
 - The change that implements a unit, or a part of one, must set the unit state
@@ -30,26 +32,8 @@ contract, the ID conventions, and the document tables.
 
 ## Conventions
 
-A unit is one implementable design element. An invisible HTML anchor marks each
-unit, and the unit ID is the anchor in upper case:
-
-```markdown
-<a id="ops-get"></a>
-
-## PIN retrieval
-```
-
-- The anchor of a unit must start with the code of its document, in lower case,
-  followed by a hyphen.
-- A unit extends from its anchor to the next unit anchor or heading, whichever
-  comes first.
-- A rule ID names one requirement inside a unit. A rule is a bold-lead list
-  item, for example: `- **OPS-GET-3** — The oracle must …`.
-- Rule numbers only append: never renumber a rule, and never reuse a number.
-- An ID must not change. To retire a unit: delete its anchor and its register
-  row, and add the ID to the "Retired IDs" table of [STATUS.md](STATUS.md).
-- Each document describes the target design in the current state only. Only
-  [ROADMAP.md](ROADMAP.md) and [STATUS.md](STATUS.md) say when work occurs.
+The ID overlay lives in [spec/CLAUDE.md](CLAUDE.md): the unit anchors, the rule
+shape, the append-only numbers, the retire procedure, and the citation forms.
 
 ## Specification documents
 

@@ -8,7 +8,7 @@ The oracle holds a key share for each client, and it releases the share only to
 a request that proves the correct PIN. It does not learn the PIN or the secret,
 and it destroys the share after three bad attempts. The service implements the
 Blockstream Jade v2 protocol, and
-[FuguPass](https://github.com/FuguBSD/FuguPass) is a reference client.
+[FuguPass](https://github.com/FuguBSD/FuguPass) is a second client.
 
 ## Commands
 

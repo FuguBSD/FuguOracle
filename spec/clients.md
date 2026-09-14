@@ -40,12 +40,12 @@ public key addresses each record.
   the envelope authenticates the oracle, and TLS protects metadata and
   availability.
 - **CLIENT-PROVISION-3** — A deployment with a private CA must also provision
-  its TLS root certificate. The client stores the certificate and hands it to
-  the companion app, which verifies the endpoint with it.
+  its TLS root certificate. The client stores the certificate and verifies the
+  endpoint with it.
 - **CLIENT-PROVISION-4** — A client can hold a second oracle URL, for example an
-  onion address. The companion app selects between the URLs. Both URLs must
-  point at the same oracle instance, because the records and the static key live
-  on one host.
+  onion address. The client selects between the URLs. Both URLs must point at
+  the same oracle instance, because the records and the static key live on one
+  host.
 
 After provisioning, the client calls `set_pin` on its next initialization or PIN
 change, and `get_pin` on every unlock.
