@@ -2,67 +2,81 @@
 # ex:ts=8 sw=4:
 # The vocabulary gate (OVW-VOCABULARY). No file that this repository
 # owns names one application of the standards. The words come from
-# spec/overview.md, so this file names none of them.
+# spec/overview.md, so this file names none of them. The three
+# repositories FuguSeed, FuguPass, and FuguOracle carry this one file.
 
 use v5.36;
 use Test::More;
 use FindBin qw($RealBin $RealScript);
+use File::Spec ();
 
 my $root = "$RealBin/../..";
 chdir $root or BAIL_OUT("chdir $root: $!");
+my $self = File::Spec->abs2rel( "$RealBin/$RealScript", $root );
 
-# The rule names each word as inline code: the word `w`. The rule
-# wraps, so the whole text is the unit of the match.
-open my $spec, '<', 'spec/overview.md' or BAIL_OUT("spec/overview.md: $!");
-my @words = do { local $/ = undef; <$spec> } =~ /the word\s+`([a-z]+)`/g;
-close $spec;
+# _slurp($path):
+#	The whole file as text, or undef when it does not open.
+sub _slurp ($path)
+{
+	open my $fh, '<', $path or return;
+	local $/ = undef;
+	my $text = <$fh>;
+	close $fh;
+	return $text;
+}
+
+# _blank($text):
+#	The line feeds of $text and nothing else, so a removal keeps
+#	every line number true.
+sub _blank ($text)
+{
+	return "\n" x ( () = $text =~ /\n/g );
+}
+
+# The rule names each word as inline code: the word `w`. The
+# formatter can wrap between the two, so the match spans a line feed.
+my $spec = _slurp('spec/overview.md') // BAIL_OUT("spec/overview.md: $!");
+my @words = $spec =~ /the word\s+`([a-z]+)`/g;
 is( scalar @words, 4, 'spec/overview.md names four banned words' );
 
-# Each word matches whole, in any letter case, singular or plural.
+# Each word matches whole, in any letter case, as itself and as a
+# plural: the word plus s, and for a word that ends in y, the stem
+# plus ies (currency, currencies; money, monies).
 my @forms;
 for my $word (@words) {
 	push @forms, $word, "${word}s";
-	push @forms, substr( $word, 0, -1 ) . 'ies' if $word =~ /y\z/;
+	push @forms, ( $word =~ s/e?y\z/ies/r ) if $word =~ /y\z/;
 }
 my $alt    = join '|', map { quotemeta } @forms;
 my $banned = qr/\b(?:$alt)\b/i;
 
-# A file that a pack of FuguBSD/Tooling owns says so in its first
-# lines, and it is outside the rule.
+# _synced($path):
+#	True when a pack of FuguBSD/Tooling owns the file. Such a file
+#	says so in its first lines, and it is outside the rule.
 sub _synced ($path)
 {
-	open my $fh, '<', $path or return 0;
-	my $head = join q{}, map { <$fh> // q{} } 1 .. 6;
-	close $fh;
-	return $head =~ m{pack of FuguBSD/Tooling owns this file};
+	my @head = split /^/m, _slurp($path) // q{};
+	splice @head, 6;
+	my $head = join q{}, @head;
+	return $head =~ /pack of FuguBSD\/Tooling owns this file/;
 }
 
-# _unfenced($text):
-#	The text without its fenced code blocks. A removed block keeps
-#	its line breaks, so the line numbers of the rest hold.
-sub _unfenced ($text)
-{
-	$text =~ s{(^```[^\n]*\n.*?^```[^\n]*$)}{ "\n" x ( () = $1 =~ /\n/g ) }gmse;
-	return $text;
-}
-
-# This file sits two directories under the root, and it is outside
-# the rule.
-my $self = join '/', ( split m{/}, $RealBin )[ -2, -1 ], $RealScript;
 my @hits;
 for my $path (`git ls-files --cached --others --exclude-standard`) {
 	chomp $path;
-	next if $path eq $self || $path =~ m{\Adocs/research/} || _synced($path);
-	open my $fh, '<', $path or next;
-	my $text = do { local $/ = undef; <$fh> };
-	close $fh;
-	my $n = 0;
-	for my $line ( split /\n/, _unfenced($text) ) {
-		$n++;
-		# The rule that names the words is the one exception.
-		next if $line =~ /the word `/;
-		$line =~ s/`[^`]*`//g;
-		push @hits, "$path:$n" if $line =~ $banned;
+	next if $path eq $self || $path =~ m{^docs/research/} || _synced($path);
+	my $text = _slurp($path) // next;
+
+	# A fenced code block and an inline code span hold names, not
+	# words. The rule that names the words is the one exception.
+	my @lines = split /\n/, $text, -1;
+	$text =~ s/^```.*?^```[^\n]*/_blank($&)/msge;
+	$text =~ s/`[^`]*`/_blank($&)/ge;
+	my $number = 0;
+	for my $line ( split /\n/, $text, -1 ) {
+		$number++;
+		next if $lines[ $number - 1 ] =~ /the word `/;
+		push @hits, "$path:$number" if $line =~ $banned;
 	}
 }
 is( "@hits", q{}, 'no file that this repository owns holds a banned word' );
