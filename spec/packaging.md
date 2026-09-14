@@ -1,6 +1,8 @@
 # Ports packaging
 
-The project delivers two OpenBSD ports, submitted together.
+This document specifies the two OpenBSD ports, `security/libsecp256k1` and
+`security/fuguoracle`. The project delivers the two ports together, in one
+submission.
 
 <a id="pkg-secp"></a>
 

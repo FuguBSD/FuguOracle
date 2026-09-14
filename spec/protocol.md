@@ -109,20 +109,20 @@ d'       = secp256k1_keypair_sec(keypair)
   `secp256k1_keypair_xonly_tweak_add`. The scalar added is the tagged hash
   `t = H_TapTweak(xonly_P ‖ m)`, with even-Y negation of `d`. The scalar added
   is not `m` itself.
-- **PROTO-TWEAK-3** — A known-answer vector generated from libwally must pin
+- **PROTO-TWEAK-3** — A known-answer vector generated from `libwally` must pin
   this derivation (see [TEST-KAT](testing.md#test-kat)).
 
-Interop note, verified against the libwally source: the upstream server calls
+Interop note, verified against the `libwally` source: the upstream server calls
 `wally_ec_private_key_bip341_tweak(d, tweak, 0)` and passes the pin-server
 "tweak" value `m` as the merkle-root argument. A service that adds `m` directly
 produces envelopes that no client can read. `secp256k1_keypair_xonly_tweak_add`
-matches libwally by construction, because libwally itself calls it.
+matches `libwally` by construction, because `libwally` itself calls it.
 
 <a id="proto-encrypt"></a>
 
 ## Envelope encryption
 
-The semantics match libwally `aes_cbc_with_ecdh_key`, verified against libwally
+The semantics match `aes_cbc_with_ecdh_key` of `libwally`, verified against its
 `src/aes.c`:
 
 ```
@@ -155,12 +155,12 @@ The labels are ASCII, with no NUL terminator:
   `d'`, same `cke`). Only the label differs.
 
 The EVP layer of `libcrypto` with default PKCS#7 padding interoperates with
-libwally. Libwally pads PKCS#7 with 1 to 16 bytes on encrypt, and it adds a full
-pad block only for a block-aligned plaintext. The libwally unpad is lenient: it
-reads the last byte modulo 16, it never fails, and it accepts strict PKCS#7
-output. The strict EVP unpad rejects forged padding that the lenient unpad
-accepts. Only a holder of the derived keys can build such an input, because the
-MAC check runs first. The service answers it with status `500` per
+`libwally`. On encrypt, `libwally` pads PKCS#7 with 1 to 16 bytes, and it adds a
+full pad block only for a block-aligned plaintext. The `libwally` unpad is
+lenient: it reads the last byte modulo 16, it never fails, and it accepts strict
+PKCS#7 output. The strict EVP unpad rejects forged padding that the lenient
+unpad accepts. Only a holder of the derived keys can build such an input,
+because the MAC check runs first. The service answers it with status `500` per
 [PROTO-HTTP-4](protocol.md#proto-http). Byte-identity testing excludes such
 vectors (see D-12).
 
@@ -178,7 +178,7 @@ set_pin:  pin_secret(32) ‖ entropy(32) ‖ sig(65)      = 129 bytes (entropy r
 
 - **PROTO-PAYLOAD-1** — The service must reject every other payload length.
 - **PROTO-PAYLOAD-2** — `sig` is a recoverable ECDSA signature of 65 bytes, in
-  the libwally format. `sig[0]` is a header byte with
+  the `libwally` format. `sig[0]` is a header byte with
   `recid = (sig[0] - 27) & 3`, and `sig[1..64]` is the compact `r ‖ s`.
 - **PROTO-PAYLOAD-3** — The signed message is
   `H( cke ‖ replay_counter ‖ pin_secret ‖ entropy )`. For the 97-byte form,

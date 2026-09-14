@@ -1,11 +1,14 @@
 # Test strategy
 
+This document specifies the known-answer tests, the unit tests, the interop
+harness, the fuzzing, the live client test, and the acceptance.
+
 <a id="test-kat"></a>
 
 ## Known-answer tests
 
 - **TEST-KAT-1** — The `regress/` suite must hold a known-answer vector for
-  every cipher shim function, generated once from upstream libwally. The
+  every cipher shim function, generated once from upstream `libwally`. The
   functions are the TapTweak derivation, the ECDH shared secret, and the
   HMAC-SHA512 KDF split. The other functions are envelope encrypt and decrypt,
   public key recovery, and record encrypt and decrypt.

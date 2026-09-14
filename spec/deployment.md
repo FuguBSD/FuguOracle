@@ -1,6 +1,7 @@
 # Deployment on OpenBSD
 
-The pkg-readme ships this configuration.
+This document specifies the httpd configuration, the slowcgi service, and the
+backup procedure. The pkg-readme ships this configuration.
 
 <a id="deploy-httpd"></a>
 

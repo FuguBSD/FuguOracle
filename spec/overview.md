@@ -1,5 +1,8 @@
 # Overview
 
+This document specifies the purpose, the scope, the vocabulary, and the risks of
+FuguOracle.
+
 <a id="ovw-purpose"></a>
 
 ## Purpose
@@ -66,9 +69,9 @@ Each non-goal is a deviation from the upstream server:
 The project implements public standards, and its words must not narrow them to
 one use (D-13).
 
-- **OVW-VOCABULARY-1** — Every artifact names the standards that it implements,
-  for example BIP39 and SeedQR. Those standards serve more than one use, and
-  every artifact stays neutral between the uses.
+- **OVW-VOCABULARY-1** — Every artifact names the standards that it implements.
+  Those standards serve more than one use, and every artifact stays neutral
+  between the uses.
 - **OVW-VOCABULARY-2** — No file that this repository owns holds the word
   `bitcoin`, the word `crypto`, the word `cryptocurrency`, or the word `money`.
   The rule covers every letter case, singular and plural. A technical name that
@@ -86,8 +89,8 @@ one use (D-13).
 | Risk                                                                                                              | Mitigation                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Upstream semantics drift in future client firmware                                                                | Protocol v2 is stable, and the record carries a version byte. Known-answer tests pin the current behavior. Watch the upstream repository.                                        |
-| TapTweak and merkle-root confusion in the key derivation, the classic interop trap                                | Generate the known-answer vector from libwally first, before any other code.                                                                                                     |
-| PKCS#7 edge cases between the EVP layer and libwally's lenient unpad                                              | The envelope known-answer tests cover block-aligned plaintexts. The 97-byte and 129-byte payload forms both exercise padding.                                                    |
+| TapTweak and merkle-root confusion in the key derivation, the classic interop trap                                | Generate the known-answer vector from `libwally` first, before any other code.                                                                                                   |
+| PKCS#7 edge cases between the EVP layer and the lenient unpad of `libwally`                                       | The envelope known-answer tests cover block-aligned plaintexts. The 97-byte and 129-byte payload forms both exercise padding.                                                    |
 | The third-strike overwrite gives a weak deletion guarantee on SSD and FFS                                         | The man page documents the limit. The wiped record is also cryptographically dead: zero key, then unlink.                                                                        |
 | A single global lock serializes requests                                                                          | Intentional. The workload is a few requests per day.                                                                                                                             |
 | No standalone `libsecp256k1` port exists in the ports tree                                                        | The companion port is a deliverable of this project.                                                                                                                             |
@@ -95,3 +98,17 @@ one use (D-13).
 | A filesystem restore of an old record resets the attempt counter and the replay counter                           | Accepted, inherited from the upstream design: the record authenticator has no freshness anchor. The operator restores `pins/` only after an incident review (see DEPLOY-BACKUP). |
 | Any caller can create records without limit                                                                       | Accepted: the protocol has no client authentication. The operator monitors free space (DEPLOY-SERVICE-3).                                                                        |
 | `set_pin` resets the replay counter to 0, so envelopes captured before a PIN change replay against the new record | Accepted, inherited from the upstream server. Anti-replay protects between PIN changes. Exploitation needs transport compromise.                                                 |
+
+- **OVW-RISKS-1** — The design accepts the weak deletion guarantee of the
+  third-strike overwrite on SSD and FFS, because the wiped record is also
+  cryptographically dead.
+- **OVW-RISKS-2** — The design accepts one global lock that serializes requests,
+  because the workload is a few requests per day.
+- **OVW-RISKS-3** — The design accepts a response time that differs between a
+  junk path that writes and one that does not, because network jitter dominates.
+- **OVW-RISKS-4** — The design accepts that a restore of an old record resets
+  both counters, because the record authenticator has no freshness anchor.
+- **OVW-RISKS-5** — The design accepts that any caller can create records
+  without limit, because the protocol has no client authentication.
+- **OVW-RISKS-6** — The design accepts a replay of a captured envelope after a
+  PIN change, because exploitation needs transport compromise.
