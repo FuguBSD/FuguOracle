@@ -26,7 +26,7 @@ CONFIGURE_ARGS = --enable-module-ecdh \
 - **PKG-SECP-3** — The `do-test` target must run the upstream test suite.
 
 The library is MIT licensed and builds cleanly with base clang. It is useful
-beyond FuguOracle, for any future Bitcoin-adjacent port.
+beyond FuguOracle, for any future port of the same family.
 
 <a id="pkg-oracle"></a>
 

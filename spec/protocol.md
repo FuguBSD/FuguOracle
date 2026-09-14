@@ -118,7 +118,7 @@ Interop note, verified against the libwally source: the upstream server calls
 produces envelopes that no client can read. `secp256k1_keypair_xonly_tweak_add`
 matches libwally by construction, because libwally itself calls it.
 
-<a id="proto-crypto"></a>
+<a id="proto-encrypt"></a>
 
 ## Envelope encryption
 
@@ -140,18 +140,18 @@ The labels are ASCII, with no NUL terminator:
 | Request (client to server)  | `blind_oracle_request`  |
 | Response (server to client) | `blind_oracle_response` |
 
-- **PROTO-CRYPTO-1** — The ECDH step must use the `libsecp256k1` default hash
+- **PROTO-ENCRYPT-1** — The ECDH step must use the `libsecp256k1` default hash
   function: SHA-256 of the compressed shared point.
-- **PROTO-CRYPTO-2** — The key derivation must split
+- **PROTO-ENCRYPT-2** — The key derivation must split
   `HMAC-SHA512(shared, label)` into `enc_key` (bytes 0 to 31) and `mac_key`
   (bytes 32 to 63).
-- **PROTO-CRYPTO-3** — To decrypt a request: split `IV(16) ‖ ct ‖ tag(32)`,
+- **PROTO-ENCRYPT-3** — To decrypt a request: split `IV(16) ‖ ct ‖ tag(32)`,
   require `timingsafe_bcmp(tag, HMAC(mac_key, IV ‖ ct)) == 0` before decryption
   (encrypt-then-MAC), then decrypt with AES-256-CBC and PKCS#7 padding.
-- **PROTO-CRYPTO-4** — To encrypt a response: draw a fresh random IV from
+- **PROTO-ENCRYPT-4** — To encrypt a response: draw a fresh random IV from
   `arc4random_buf(3)`, then output
   `IV ‖ CBC-encrypt(payload) ‖ HMAC(mac_key, IV ‖ ct)`.
-- **PROTO-CRYPTO-5** — Both directions must use the same `shared` secret (same
+- **PROTO-ENCRYPT-5** — Both directions must use the same `shared` secret (same
   `d'`, same `cke`). Only the label differs.
 
 The EVP layer of `libcrypto` with default PKCS#7 padding interoperates with
@@ -206,7 +206,7 @@ the PIN record (see [STORE-KEYS](storage.md#store-keys)).
 
 - **PROTO-RESPONSE-1** — The response plaintext is one 32-byte AES key.
 - **PROTO-RESPONSE-2** — The service must envelope the response per
-  [PROTO-CRYPTO](protocol.md#proto-crypto) with the response label. The
+  [PROTO-ENCRYPT](protocol.md#proto-encrypt) with the response label. The
   enveloped size is exactly `16 + 48 + 32 = 96` bytes.
 - **PROTO-RESPONSE-3** — The service must encode the envelope as base64 and must
   return it as `{"data": "<base64>"}`.

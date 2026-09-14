@@ -77,7 +77,7 @@ Bring-up:
   and no state beyond the `pins/` directory.
 - **DEPLOY-SERVICE-3** — The operator must monitor the free space of the
   filesystem that holds `pins/`: any caller can create records without limit
-  (see the [risks](overview.md#ovr-risks)). The operator can mount a dedicated
+  (see the [risks](overview.md#ovw-risks)). The operator can mount a dedicated
   filesystem on `/var/www/fuguoracle`, so that a fill cannot starve the rest of
   `/var/www`.
 
@@ -98,7 +98,7 @@ recover by that path.
   warning.
 - **DEPLOY-BACKUP-4** — The operator must restore `pins/` only after an incident
   review. A restore rewinds attempt counters and replay counters to the backup
-  time (see the [risks](overview.md#ovr-risks)).
+  time (see the [risks](overview.md#ovw-risks)).
 - **DEPLOY-BACKUP-5** — Key rotation in place is not supported: every storage
   key derives from the static key, so a new key orphans every record. On a
   suspected key compromise, the operator must generate a new key and must clear
