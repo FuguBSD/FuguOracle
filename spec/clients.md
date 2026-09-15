@@ -1,5 +1,8 @@
 # Client integration
 
+This document specifies the client model, the provisioning procedure, and the
+reference client.
+
 <a id="client-model"></a>
 
 ## Client model

@@ -1,5 +1,8 @@
 # Architecture
 
+This document specifies the service stack, the dependencies, and the source
+layout.
+
 <a id="arch-stack"></a>
 
 ## Service stack
@@ -77,7 +80,7 @@ delivers (see [PKG-SECP](packaging.md#pkg-secp)).
   compiles the static program. The service needs no virtual machine of its own.
 
 `libsecp256k1` is the reference implementation that the upstream server uses,
-through libwally. It gives constant-time scalar arithmetic and the exact ECDH,
+through `libwally`. It gives constant-time scalar arithmetic and the exact ECDH,
 recovery, and x-only tweak semantics that the wire protocol assumes.
 
 <a id="arch-layout"></a>
@@ -89,7 +92,7 @@ fuguoracle/
 ├── Makefile            BSD make, bsd.prog.mk style
 ├── main.c              CGI entry, dispatch, pledge/unveil, limits
 ├── http.c/.h           CGI environment, body read, JSON in/out, base64
-├── crypto.c/.h         Key tweak, ECDH envelope, hashes, AES (EVP)
+├── cipher.c/.h         Key tweak, ECDH envelope, hashes, AES (EVP)
 ├── oracle.c/.h         Payload parsing and the get/set state machine
 ├── pindb.c/.h          Records, locking, atomic writes
 ├── keygen.c            fuguoracle-keygen
@@ -98,10 +101,11 @@ fuguoracle/
 └── regress/            Known-answer tests and unit tests (make regress)
 ```
 
-- **ARCH-LAYOUT-1** — Only `crypto.c` can include the `libsecp256k1` and
+- **ARCH-LAYOUT-1** — Only `cipher.c` can include the `libsecp256k1` and
   `libcrypto` headers.
-- **ARCH-LAYOUT-2** — `crypto.c` must expose a small shim API to `oracle.c` and
-  `pindb.c`. This keeps the libwally-semantics surface in one reviewable place.
+- **ARCH-LAYOUT-2** — `cipher.c` must expose a small shim API to `oracle.c` and
+  `pindb.c`. This keeps the surface that matches the `libwally` semantics in one
+  reviewable place.
 - **ARCH-LAYOUT-3** — The build must use `-Wall -Wextra -Werror`.
 - **ARCH-LAYOUT-4** — The target size of the implementation is about 1,500 lines
   of C.

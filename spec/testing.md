@@ -1,18 +1,21 @@
 # Test strategy
 
+This document specifies the known-answer tests, the unit tests, the interop
+harness, the fuzzing, the live client test, and the acceptance.
+
 <a id="test-kat"></a>
 
 ## Known-answer tests
 
 - **TEST-KAT-1** — The `regress/` suite must hold a known-answer vector for
-  every crypto shim function, generated once from upstream libwally. The
+  every cipher shim function, generated once from upstream `libwally`. The
   functions are the TapTweak derivation, the ECDH shared secret, and the
   HMAC-SHA512 KDF split. The other functions are envelope encrypt and decrypt,
   public key recovery, and record encrypt and decrypt.
 - **TEST-KAT-2** — The vectors are committed as hex. `make regress` must need no
   Python and no network.
 - **TEST-KAT-3** — The TapTweak vector must exist before any other code (see the
-  [risks](overview.md#ovr-risks)).
+  [risks](overview.md#ovw-risks)).
 
 <a id="test-unit"></a>
 

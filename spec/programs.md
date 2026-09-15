@@ -1,5 +1,7 @@
 # Programs
 
+This document specifies the two programs, `fuguoracle` and `fuguoracle-keygen`.
+
 <a id="prog-cgi"></a>
 
 ## fuguoracle, the CGI program

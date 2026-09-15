@@ -1,5 +1,8 @@
 # Security design
 
+This document specifies the threat model, the sandbox, the memory hygiene, the
+randomness, and the logging.
+
 <a id="sec-threat"></a>
 
 ## Threat model

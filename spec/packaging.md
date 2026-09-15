@@ -1,6 +1,8 @@
 # Ports packaging
 
-The project delivers two OpenBSD ports, submitted together.
+This document specifies the two OpenBSD ports, `security/libsecp256k1` and
+`security/fuguoracle`. The project delivers the two ports together, in one
+submission.
 
 <a id="pkg-secp"></a>
 
@@ -26,7 +28,7 @@ CONFIGURE_ARGS = --enable-module-ecdh \
 - **PKG-SECP-3** — The `do-test` target must run the upstream test suite.
 
 The library is MIT licensed and builds cleanly with base clang. It is useful
-beyond FuguOracle, for any future Bitcoin-adjacent port.
+beyond FuguOracle, for any future port of the same family.
 
 <a id="pkg-oracle"></a>
 

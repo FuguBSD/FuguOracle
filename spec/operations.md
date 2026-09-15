@@ -32,7 +32,7 @@ SHA-256. `HMAC(k, m)` is HMAC-SHA256.
 
 `set_pin` persists `replay_counter = 0`. Envelopes captured before a PIN change
 stay replayable against the new record, until the stored counter passes their
-values. The [risk table](overview.md#ovr-risks) records this accepted property.
+values. The [risk table](overview.md#ovw-risks) records this accepted property.
 
 <a id="ops-get"></a>
 
@@ -95,7 +95,7 @@ return HTTP error statuses (see [OPS-SET-7](operations.md#ops-set) and D-10).
   missing record, or from a replayed request. The status, the headers, and the
   envelope size must be identical on every junk path. The only failure signal is
   the client's own decrypt failure. Response time can differ between paths that
-  write and paths that do not; the [risk table](overview.md#ovr-risks) records
+  write and paths that do not; the [risk table](overview.md#ovw-risks) records
   this accepted risk. The design depends on this property: preserve it exactly
   (see D-10).
 - **OPS-JUNK-3** — HTTP error statuses answer every failure class outside the

@@ -1,6 +1,9 @@
 # Overview
 
-<a id="ovr-purpose"></a>
+This document specifies the purpose, the scope, the vocabulary, and the risks of
+FuguOracle.
+
+<a id="ovw-purpose"></a>
 
 ## Purpose
 
@@ -17,22 +20,22 @@ encrypted secret on the client becomes undecryptable.
 The security of the scheme rests on two properties: the secrecy of the oracle's
 static secp256k1 key, and the integrity of the attempt counter.
 
-- **OVR-PURPOSE-1** — The oracle must not learn the PIN.
-- **OVR-PURPOSE-2** — The oracle must not learn the protected secret.
-- **OVR-PURPOSE-3** — The oracle must serve every client that speaks the wire
+- **OVW-PURPOSE-1** — The oracle must not learn the PIN.
+- **OVW-PURPOSE-2** — The oracle must not learn the protected secret.
+- **OVW-PURPOSE-3** — The oracle must serve every client that speaks the wire
   protocol. The design must not depend on properties of one client product.
-- **OVR-PURPOSE-4** — One oracle instance can serve many clients at the same
+- **OVW-PURPOSE-4** — One oracle instance can serve many clients at the same
   time.
 
-<a id="ovr-scope"></a>
+<a id="ovw-scope"></a>
 
-## Scope
+## Scope and non-goals
 
 The wire protocol is version 2 of the Blockstream `blind_pin_server` protocol.
 The upstream reference is `github.com/Blockstream/blind_pin_server` (Python).
 [Blockstream Jade](clients.md#client-jade) is the reference client.
 
-Goals:
+The scope:
 
 - Serve the smallest viable feature set: protocol v2 only.
 - Use the OpenBSD base system for everything except secp256k1 arithmetic.
@@ -43,31 +46,51 @@ Goals:
   `syslog(3)`. It also uses `mdoc(7)` man pages, an rc.d script, and a clean
   ports-tree package.
 
-Non-goals, as deviations from the upstream server:
+Each non-goal is a deviation from the upstream server:
 
-| Upstream feature                                                 | FuguOracle                                                        | Rationale                                                                                                                         |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Protocol v1 (`/start_handshake`, sessions, explicit hmac fields) | Absent                                                            | Legacy clients only. v2 is stateless: no session table, no lifetime configuration.                                                |
-| Redis storage backend                                            | Absent                                                            | Flat files in one directory serve the workload.                                                                                   |
-| `python-dotenv` configuration                                    | Absent                                                            | Compile-time paths, documented in the man page.                                                                                   |
-| Flask, Werkzeug, gunicorn, nginx                                 | Absent                                                            | `httpd(8)` and `slowcgi(8)` come from base.                                                                                       |
-| Non-atomic record writes                                         | Corrected                                                         | Writes use `mkstemp(3)`, `fsync(2)`, and `rename(2)`.                                                                             |
-| v0 to v1 database migration                                      | Absent                                                            | Fresh deployments write and read record version `0x01` only.                                                                      |
-| HTTP 500 for every request-parse failure                         | `400` before envelope decryption, empty error bodies              | A malformed request is a client error, and the status says so. Failures from the MAC check onward keep status `500`, as upstream. |
-| No request body size limit                                       | `413` for a body larger than 4096 bytes                           | The cap bounds the input surface. Honest v2 bodies stay under 400 bytes.                                                          |
-| Lenient base64 and JSON reading                                  | Strict `b64_pton` and a strict scanner; a violation answers `400` | Lenient parsing grows the input surface. Honest clients send canonical encodings.                                                 |
-| Junk key on a `get_pin` record I/O failure, read or persist      | Status `500`, fail closed                                         | An attempt that the service cannot count must not receive an answer (see OPS-GET-7).                                              |
-| Lenient CBC unpad that never fails                               | Strict PKCS#7 unpad; forged padding answers `500`                 | Only a holder of the derived keys can build such an input, because the MAC check runs first.                                      |
+| Non-goal                                                         | Statement                                                                                                                                                                                                         |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protocol v1 (`/start_handshake`, sessions, explicit hmac fields) | Absent. Legacy clients only. v2 is stateless: no session table, no lifetime configuration.                                                                                                                        |
+| Redis storage backend                                            | Absent. Flat files in one directory serve the workload.                                                                                                                                                           |
+| `python-dotenv` configuration                                    | Absent. Compile-time paths, documented in the man page.                                                                                                                                                           |
+| Flask, Werkzeug, gunicorn, nginx                                 | Absent. `httpd(8)` and `slowcgi(8)` come from base.                                                                                                                                                               |
+| Non-atomic record writes                                         | Corrected. Writes use `mkstemp(3)`, `fsync(2)`, and `rename(2)`.                                                                                                                                                  |
+| v0 to v1 database migration                                      | Absent. Fresh deployments write and read record version `0x01` only.                                                                                                                                              |
+| HTTP 500 for every request-parse failure                         | The service answers `400` before envelope decryption, with an empty error body. A malformed request is a client error, and the status says so. Failures from the MAC check onward keep status `500`, as upstream. |
+| No request body size limit                                       | The service answers `413` for a body larger than 4096 bytes. The cap bounds the input surface. Honest v2 bodies stay under 400 bytes.                                                                             |
+| Lenient base64 and JSON reading                                  | Strict `b64_pton` and a strict scanner; a violation answers `400`. Lenient parsing grows the input surface. Honest clients send canonical encodings.                                                              |
+| Junk key on a `get_pin` record I/O failure, read or persist      | Status `500`, fail closed. An attempt that the service cannot count must not receive an answer (see OPS-GET-7).                                                                                                   |
+| Lenient CBC unpad that never fails                               | Strict PKCS#7 unpad; forged padding answers `500`. Only a holder of the derived keys can build such an input, because the MAC check runs first.                                                                   |
 
-<a id="ovr-risks"></a>
+<a id="ovw-vocabulary"></a>
 
-## Risks
+## Vocabulary
+
+The project implements public standards, and its words must not narrow them to
+one use (D-13).
+
+- **OVW-VOCABULARY-1** — Every artifact names the standards that it implements.
+  Those standards serve more than one use, and every artifact stays neutral
+  between the uses.
+- **OVW-VOCABULARY-2** — No file that this repository owns holds the word
+  `bitcoin`, the word `crypto`, the word `cryptocurrency`, or the word `money`.
+  The rule covers every letter case, singular and plural. A technical name that
+  an external project fixes, such as `libcrypto`, is not a word. It sits in a
+  code span, and it names the external thing only.
+- **OVW-VOCABULARY-3** — A test reads the banned words from this document and
+  scans every tracked file for them. The scan skips a code span, a code block,
+  and a file that a pack of FuguBSD/Tooling owns. It also skips a record under
+  `docs/research/` and the rule that names the words.
+
+<a id="ovw-risks"></a>
+
+## Risks and limits
 
 | Risk                                                                                                              | Mitigation                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Upstream semantics drift in future client firmware                                                                | Protocol v2 is stable, and the record carries a version byte. Known-answer tests pin the current behavior. Watch the upstream repository.                                        |
-| TapTweak and merkle-root confusion in the key derivation, the classic interop trap                                | Generate the known-answer vector from libwally first, before any other code.                                                                                                     |
-| PKCS#7 edge cases between the EVP layer and libwally's lenient unpad                                              | The envelope known-answer tests cover block-aligned plaintexts. The 97-byte and 129-byte payload forms both exercise padding.                                                    |
+| TapTweak and merkle-root confusion in the key derivation, the classic interop trap                                | Generate the known-answer vector from `libwally` first, before any other code.                                                                                                   |
+| PKCS#7 edge cases between the EVP layer and the lenient unpad of `libwally`                                       | The envelope known-answer tests cover block-aligned plaintexts. The 97-byte and 129-byte payload forms both exercise padding.                                                    |
 | The third-strike overwrite gives a weak deletion guarantee on SSD and FFS                                         | The man page documents the limit. The wiped record is also cryptographically dead: zero key, then unlink.                                                                        |
 | A single global lock serializes requests                                                                          | Intentional. The workload is a few requests per day.                                                                                                                             |
 | No standalone `libsecp256k1` port exists in the ports tree                                                        | The companion port is a deliverable of this project.                                                                                                                             |
@@ -75,3 +98,17 @@ Non-goals, as deviations from the upstream server:
 | A filesystem restore of an old record resets the attempt counter and the replay counter                           | Accepted, inherited from the upstream design: the record authenticator has no freshness anchor. The operator restores `pins/` only after an incident review (see DEPLOY-BACKUP). |
 | Any caller can create records without limit                                                                       | Accepted: the protocol has no client authentication. The operator monitors free space (DEPLOY-SERVICE-3).                                                                        |
 | `set_pin` resets the replay counter to 0, so envelopes captured before a PIN change replay against the new record | Accepted, inherited from the upstream server. Anti-replay protects between PIN changes. Exploitation needs transport compromise.                                                 |
+
+- **OVW-RISKS-1** — The design accepts the weak deletion guarantee of the
+  third-strike overwrite on SSD and FFS, because the wiped record is also
+  cryptographically dead.
+- **OVW-RISKS-2** — The design accepts one global lock that serializes requests,
+  because the workload is a few requests per day.
+- **OVW-RISKS-3** — The design accepts a response time that differs between a
+  junk path that writes and one that does not, because network jitter dominates.
+- **OVW-RISKS-4** — The design accepts that a restore of an old record resets
+  both counters, because the record authenticator has no freshness anchor.
+- **OVW-RISKS-5** — The design accepts that any caller can create records
+  without limit, because the protocol has no client authentication.
+- **OVW-RISKS-6** — The design accepts a replay of a captured envelope after a
+  PIN change, because exploitation needs transport compromise.
