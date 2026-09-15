@@ -40,7 +40,7 @@ sub _blank ($text)
 # formatter can wrap between the two, so the match spans a line feed.
 my $spec = _slurp('spec/overview.md') // BAIL_OUT("spec/overview.md: $!");
 my @words = $spec =~ /the word\s+`([a-z]+)`/g;
-is( scalar @words, 4, 'spec/overview.md names four banned words' );
+is( scalar @words, 5, 'spec/overview.md names five banned words' );
 
 # Each word matches whole, in any letter case, as itself and as a
 # plural: the word plus s, and for a word that ends in y, the stem

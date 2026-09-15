@@ -72,11 +72,12 @@ one use (D-13).
 - **OVW-VOCABULARY-1** — Every artifact names the standards that it implements.
   Those standards serve more than one use, and every artifact stays neutral
   between the uses.
-- **OVW-VOCABULARY-2** — No file that this repository owns holds the word
-  `bitcoin`, the word `crypto`, the word `cryptocurrency`, or the word `money`.
-  The rule covers every letter case, singular and plural. A technical name that
-  an external project fixes, such as `libcrypto`, is not a word. It sits in a
-  code span, and it names the external thing only.
+- **OVW-VOCABULARY-2** — No file that this repository owns holds a banned word.
+  The banned words are the word `bitcoin`, the word `crypto`, the word
+  `cryptocurrency`, the word `money`, and the word `wallet`. The rule covers
+  every letter case, singular and plural. A technical name that an external
+  project fixes, such as `libcrypto`, is not a word. It sits in a code span, and
+  it names the external thing only.
 - **OVW-VOCABULARY-3** — A test reads the banned words from this document and
   scans every tracked file for them. The scan skips a code span, a code block,
   and a file that a pack of FuguBSD/Tooling owns. It also skips a record under

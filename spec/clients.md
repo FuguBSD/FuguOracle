@@ -57,9 +57,9 @@ change, and `get_pin` on every unlock.
 
 ## Blockstream Jade, the reference client
 
-The Blockstream Jade hardware wallet is the reference client. The Jade holds a
-wallet secret encrypted under a key that it does not store. It relays oracle
-calls through the companion app (Green app or gdk) over USB, BLE, or QR.
+The Blockstream Jade hardware signer is the reference client. The Jade holds its
+seed encrypted under a key that it does not store. It relays oracle calls
+through the companion app (Green app or gdk) over USB, BLE, or QR.
 
 - **CLIENT-JADE-1** — The service must serve the current Jade firmware, which
   speaks protocol v2.
@@ -68,5 +68,5 @@ calls through the companion app (Green app or gdk) over USB, BLE, or QR.
   static public key.
 - **CLIENT-JADE-3** — An initialized Jade refuses a change of the oracle public
   key, with the message `Cannot update initialized unit`. The operator must
-  provision the oracle before the first wallet setup, or must factory-reset the
+  provision the oracle before the first seed setup, or must factory-reset the
   unit first. URL and certificate updates stay possible on an initialized unit.

@@ -88,8 +88,8 @@ Bring-up:
 
 The static key is the service. Loss of `private.key`, or of the `pins/`
 directory, makes the PIN unlock of every enrolled client permanently inoperable.
-A client with its own recovery path, such as a wallet recovery phrase, can still
-recover by that path.
+A client with its own recovery path, such as its seed words, can still recover
+by that path.
 
 - **DEPLOY-BACKUP-1** — The operator must back up the static key offline at
   enrollment time.
