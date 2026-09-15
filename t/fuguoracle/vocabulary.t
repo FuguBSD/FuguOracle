@@ -5,7 +5,10 @@
 # spec/overview.md, so this file names none of them. The three
 # repositories FuguSeed, FuguPass, and FuguOracle carry this one file.
 
-use v5.36;
+use v5.34;
+use warnings;
+use experimental 'signatures';
+no feature qw(indirect multidimensional bareword_filehandles);
 use Test::More;
 use FindBin qw($RealBin $RealScript);
 use File::Spec ();
