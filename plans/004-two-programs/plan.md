@@ -4,14 +4,15 @@
 
 Proposed. It waits on plan 003 for the operations. Plan 005 waits on it.
 
-Implements: PROTO-HTTP, PROG-CGI, PROG-KEYGEN, SEC-SANDBOX, SEC-LOGGING.
-Implements: ARCH-LAYOUT, SEC-MEMORY, OPS-WIPE. Defers: DEPLOY-HTTPD,
-DEPLOY-SERVICE.
+Implements: PROTO-HTTP, PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-SANDBOX,
+SEC-LOGGING. Implements: ARCH-LAYOUT, SEC-MEMORY, OPS-WIPE. Defers:
+DEPLOY-HTTPD, DEPLOY-SERVICE.
 
 Of the three shared units, this plan lands ARCH-LAYOUT-4, SEC-MEMORY-5, and
-OPS-WIPE-3, and each unit reaches `done`. The deployment files are the work of
-plan 005. This plan runs the program under a hand-made `httpd(8)` and
-`slowcgi(8)` in the guest.
+OPS-WIPE-3, and each unit reaches `done`. Of PROTO-RESPONSE, this plan lands
+PROTO-RESPONSE-3 alone, and plan 003 lands the other two rules. The deployment
+files are the work of plan 005. This plan runs the program under a hand-made
+`httpd(8)` and `slowcgi(8)` in the guest.
 
 ## Purpose
 
@@ -89,7 +90,8 @@ and the owner `_fuguoracle`, refuses a second run, and prints 66 hex digits.
 
 - `make check` passes on the host, and `regress/guest` passes in the guest.
 - In the guest, `slowcgi(8)` and `httpd(8)` serve one `set_pin` and one
-  `get_pin` from the upstream `client.py`.
+  `get_pin`. The regress-side client of plan 003 builds each request envelope in
+  C.
 - Every cited unit reads `done`.
 - The change deletes this plan.
 

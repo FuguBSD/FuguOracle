@@ -8,15 +8,15 @@ below: the vocabulary rule forbids a word that the `libsecp256k1` port must
 name.
 
 Implements: PKG-SECP, PKG-ORACLE, DEPLOY-BACKUP, CLIENT-PROVISION, CLIENT-JADE,
-TEST-LIVE.
+TEST-LIVE. Defers: OVW-VOCABULARY.
 
 ## Purpose
 
 The project delivers two OpenBSD ports in one submission:
-`security/libsecp256k1` and `security/fuguoracle` (D-07). The second port
-carries the pkg-readme. The pkg-readme carries the operator text: the bring-up,
-the backup warning, and the key rotation procedure. It also carries the client
-provisioning and the live test before real use.
+`security/libsecp256k1` and `security/fuguoracle` (`spec/packaging.md`). The
+second port carries the pkg-readme. The pkg-readme carries the operator text:
+the bring-up, the backup warning, and the key rotation procedure. It also
+carries the client provisioning and the live test before real use.
 
 ## Constraints that shape the design
 
@@ -35,10 +35,12 @@ PKG-ORACLE-3. `make regress` runs the known-answer suite with no network
 through the GitHub mechanism of the ports tree, and `distinfo` pins it. The
 operator tags the release before the port build.
 
-**The pkg-readme points, and the manual page holds.** The operator statements of
-DEPLOY-BACKUP and CLIENT-PROVISION live in `fuguoracle.8`. The pkg-readme holds
-the bring-up commands, the path of the `httpd.conf` example, the Jade procedure,
-and the live test. It points to the manual page for the rest.
+**The pkg-readme and the manual page both hold the operator text.** The backup
+warning and the key rotation procedure live in the pkg-readme and in
+`fuguoracle.8`. DEPLOY-BACKUP-3 and DEPLOY-BACKUP-5 name the two artifacts. The
+pkg-readme also holds the bring-up commands, the path of the `httpd.conf`
+example, the Jade procedure, and the live test. It points to the manual page for
+the provisioning statements.
 
 **Both architectures build.** The developer builds both ports on an amd64 guest
 and on an arm64 guest, with `fuguvm` as a command only (PKG-ORACLE-6,
@@ -46,20 +48,20 @@ PKG-ORACLE-7). A port never depends on `fuguvm`.
 
 ## Files
 
-| File                                    | Change                                        |
-| --------------------------------------- | --------------------------------------------- |
-| `ports/security/libsecp256k1/Makefile`  | The library port                              |
-| `ports/security/libsecp256k1/distinfo`  | The pinned distfile                           |
-| `ports/security/libsecp256k1/pkg/DESCR` | The description                               |
-| `ports/security/libsecp256k1/pkg/PLIST` | The archive, the headers, the pkg-config file |
-| `ports/security/fuguoracle/Makefile`    | The service port                              |
-| `ports/security/fuguoracle/distinfo`    | The pinned tag                                |
-| `ports/security/fuguoracle/pkg/DESCR`   | The description                               |
-| `ports/security/fuguoracle/pkg/PLIST`   | The files, the user, the sample directories   |
-| `ports/security/fuguoracle/pkg/README`  | The pkg-readme                                |
-| `fuguoracle.8`                          | The backup and the provisioning statements    |
-| `regress/guest`                         | The port build in place of the tarball build  |
-| `spec/STATUS.md`                        | The cited units                               |
+| File                                    | Change                                                |
+| --------------------------------------- | ----------------------------------------------------- |
+| `ports/security/libsecp256k1/Makefile`  | The library port                                      |
+| `ports/security/libsecp256k1/distinfo`  | The pinned distfile                                   |
+| `ports/security/libsecp256k1/pkg/DESCR` | The description                                       |
+| `ports/security/libsecp256k1/pkg/PLIST` | The archive, the headers, the pkg-config file         |
+| `ports/security/fuguoracle/Makefile`    | The service port                                      |
+| `ports/security/fuguoracle/distinfo`    | The pinned tag                                        |
+| `ports/security/fuguoracle/pkg/DESCR`   | The description                                       |
+| `ports/security/fuguoracle/pkg/PLIST`   | The files, the user, the sample directories           |
+| `ports/security/fuguoracle/pkg/README`  | The bring-up, the backup, the rotation, the live test |
+| `fuguoracle.8`                          | The backup and the provisioning statements            |
+| `regress/guest`                         | The port build in place of the tarball build          |
+| `spec/STATUS.md`                        | The cited units                                       |
 
 ## Tests
 
@@ -86,10 +88,10 @@ The library port must name the upstream GitHub account in `GH_ACCOUNT`, and the
 first half of that name is a banned word (D-13, OVW-VOCABULARY-2). The
 vocabulary test exempts a code span, a code block, `docs/research/`, and a
 synced file, and a port Makefile is none of these. Two ways out exist, and each
-needs human approval first. The first amends D-13 and OVW-VOCABULARY-3 to exempt
-`ports/`, in this repository and in the two sibling repositories that share the
-test. The second fetches the distfile from an address of the organization, and
-that breaks the convention of the ports tree for a submission.
+needs human approval first. The first amends D-13 and OVW-VOCABULARY-3 of this
+repository to exempt `ports/`. The same decision reaches each sibling repository
+through its own plan. The second fetches the distfile from an address of the
+organization, and that breaks the convention of the ports tree for a submission.
 
 ## What this plan does not do
 

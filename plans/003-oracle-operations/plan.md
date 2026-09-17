@@ -4,13 +4,15 @@
 
 Proposed. It waits on plan 002 for the store. Plan 004 waits on it.
 
-Implements: PROTO-ENVELOPE, PROTO-PAYLOAD, PROTO-RESPONSE, OPS-SET, OPS-GET,
-OPS-JUNK, OVW-PURPOSE. Defers: PROTO-HTTP, SEC-LOGGING, TEST-ACCEPT.
+Implements: PROTO-ENVELOPE, PROTO-PAYLOAD, OPS-SET, OPS-GET, OPS-JUNK,
+OVW-PURPOSE. Implements: PROTO-RESPONSE without PROTO-RESPONSE-3. Defers:
+PROTO-HTTP, SEC-LOGGING, TEST-ACCEPT.
 
 The operations return a decision and an outcome class. Plan 004 maps the
 decision to an HTTP status (PROTO-HTTP) and writes the outcome class to the log
-(SEC-LOGGING). The draw order of TEST-ACCEPT-2 binds this plan, and plan 005
-proves it against the upstream server.
+(SEC-LOGGING). PROTO-RESPONSE-3 encodes the envelope as base64 and returns the
+JSON object, and plan 004 lands it. The draw order of TEST-ACCEPT-2 binds this
+plan, and plan 005 proves it against the upstream server.
 
 ## Purpose
 
@@ -85,7 +87,8 @@ signs with `secp256k1_ecdsa_sign_recoverable`, which the service never calls.
 ## Acceptance
 
 - `make check` passes on the host, and `regress/guest` passes in the guest.
-- Every cited unit reads `done`.
+- Every cited unit reads `done`, except PROTO-RESPONSE, which reads `partial`
+  with PROTO-RESPONSE-3 as the absent part.
 - The change deletes this plan.
 
 ## What this plan does not do

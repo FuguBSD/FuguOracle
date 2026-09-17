@@ -89,7 +89,8 @@ port.
 - The envelope seal with a fixed IV from the seam equals the `libwally` output
   (PROTO-ENCRYPT-4).
 - The public key recovery from the signed payload hash.
-- The record encrypt and decrypt of one 80-byte plaintext.
+- The record encrypt and decrypt of the 69-byte record plaintext, which PKCS#7
+  pads to an 80-byte ciphertext.
 - The seam returns the file bytes in order under `-DREGRESS`.
 
 ## Acceptance

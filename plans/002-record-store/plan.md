@@ -40,14 +40,17 @@ across load, decide, and store (STORE-ATOMIC-1). A store is `mkstemp(3)` in
 calls `fsync(2)`, then `unlink(2)` (OPS-WIPE-2).
 
 **The record directory is a constant.** `PINS_DIR` is a compile-time constant
-(D-06). The regress build reads the directory from the environment variable
-`FUGUORACLE_PINS`, so each test runs in its own temporary directory. This is the
-second and last regress seam, beside the random seam.
+(D-06). The regress build compiles the store with its own `PINS_DIR` constant, a
+directory of the regress tree. The path stays a compile-time constant, and each
+test clears that directory between two cases.
 
-**A test hook stops a write.** The regress build calls `pindb_test_hook` at two
-stages: before the `rename(2)` of a store, and between the `fsync(2)` and the
-`unlink(2)` of a wipe. The test installs the hook to stop a write or to read the
-file. The service build holds no hook.
+**A test hook stops a write.** TEST-UNIT-2 needs a test of a write that stops
+before the `rename(2)`. TEST-UNIT-1 needs a test that reads the record before
+the `unlink(2)`. The regress build therefore calls `pindb_test_hook` at two
+stages. The first is before the `rename(2)` of a store. The second is between
+the `fsync(2)` and the `unlink(2)` of a wipe. The test installs the hook to stop
+a write or to read the file. The hook exists in the regress build alone, and the
+service build holds none.
 
 ## Files
 
