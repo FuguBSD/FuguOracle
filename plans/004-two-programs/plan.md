@@ -8,11 +8,11 @@ Implements: PROTO-HTTP, PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-SANDBOX,
 SEC-LOGGING. Implements: ARCH-LAYOUT, SEC-MEMORY, OPS-WIPE. Defers:
 DEPLOY-HTTPD, DEPLOY-SERVICE.
 
-Of the three shared units, this plan lands ARCH-LAYOUT-4, SEC-MEMORY-5, and
-OPS-WIPE-3, and each unit reaches `done`. Of PROTO-RESPONSE, this plan lands
-PROTO-RESPONSE-3 alone, and plan 003 lands the other two rules. The deployment
-files are the work of plan 005. This plan runs the program under a hand-made
-`httpd(8)` and `slowcgi(8)` in the guest.
+Of the four shared units, this plan lands ARCH-LAYOUT-4, SEC-MEMORY-5,
+OPS-WIPE-3, and PROTO-RESPONSE-3, and each unit reaches `done`. Plan 003 lands
+the other two rules of PROTO-RESPONSE. The deployment files are the work of
+plan 005. This plan runs the program directly, with the CGI variables in the
+environment.
 
 ## Purpose
 
@@ -79,7 +79,8 @@ environment and the body on standard input, and holds:
 - Malformed JSON, bad base64, a duplicate `data` member, and a short envelope
   answer `400`.
 - A `set_pin` and a `get_pin` round trip answer `200` with the header of
-  PROTO-HTTP-6, through the fixed random file.
+  PROTO-HTTP-6. The test reads a request envelope of the known-answer vectors
+  from `regress/vectors.h`, encodes it as base64, and sends it as the body.
 - The log line holds the outcome class and no hex of the request.
 - The line count of the C sources stays near the target of ARCH-LAYOUT-4.
 
@@ -89,11 +90,11 @@ and the owner `_fuguoracle`, refuses a second run, and prints 66 hex digits.
 ## Acceptance
 
 - `make check` passes on the host, and `regress/guest` passes in the guest.
-- In the guest, `slowcgi(8)` and `httpd(8)` serve one `set_pin` and one
-  `get_pin`. The regress-side client of plan 003 builds each request envelope in
-  C.
 - Every cited unit reads `done`.
 - The change deletes this plan.
+
+The round trip through `httpd(8)` and `slowcgi(8)` belongs to plan 005, which
+lands the deployment files and the interop harness.
 
 ## What this plan does not do
 

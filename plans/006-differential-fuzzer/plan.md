@@ -19,8 +19,8 @@ and it never enters the port (TEST-FUZZ-2).
 
 **The fuzzer runs in the guest.** The CGI program runs on OpenBSD only, and the
 fuzzer calls it directly (TEST-FUZZ-4). The guest therefore gains Perl with the
-Fugu distribution, through `cpanm`, and the snapshot of plan 005 records the
-addition.
+Fugu distribution, through `cpanm`, and the guest snapshot of `regress/interop`
+records the addition.
 
 **Every process is a Fugu process.** The fuzzer starts the upstream server with
 `Fugu::Process->spawn_command` and stops it with `Fugu::Process->terminate`.
@@ -34,11 +34,11 @@ TEST-FUZZ-4). It never runs a shell.
 mutations. Each failing case goes to a file with `Fugu::File->write_atomic`,
 under a directory that the caller names (TEST-FUZZ-3).
 
-**The decision is one of three.** Both servers read the fixed random file of
-plan 005, so a real key is byte-identical on both sides. An HTTP error status is
-a reject. A `200` body that decrypts to the enrolled key is a real key, and any
-other `200` body is junk. The fuzzer enrolls one record on each server first,
-then mutates `get_pin` requests against it.
+**The decision is one of three.** Both servers read `regress/random.bin`, so a
+real key is byte-identical on both sides. An HTTP error status is a reject. A
+`200` body that decrypts to the enrolled key is a real key, and any other `200`
+body is junk. The fuzzer enrolls one record on each server first, then mutates
+`get_pin` requests against it.
 
 ## Files
 

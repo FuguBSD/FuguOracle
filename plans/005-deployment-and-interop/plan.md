@@ -26,7 +26,7 @@ fixed random bytes, the same `200` bodies from both servers.
 `ports/security/fuguoracle/pkg/fuguoracle.rc` wraps the base `slowcgi(8)` with
 the flags of DEPLOY-SERVICE-1. `ports/security/fuguoracle/files/httpd.conf` is
 the fragment of DEPLOY-HTTPD, and the port installs it as an example. The manual
-page of plan 004 gains the free-space statement of DEPLOY-SERVICE-3.
+page `fuguoracle.8` gains the free-space statement of DEPLOY-SERVICE-3.
 
 **The harness is a Perl program on Fugu, on the host.** `regress/interop` runs
 `fuguvm` as a command only, with `Fugu::Process` and an argument list
@@ -45,7 +45,7 @@ the checks that the upstream suite lacks: the junk uniformity and the failure
 table (TEST-INTEROP-2, TEST-INTEROP-3).
 
 **Both servers read one random file.** The regress build of the CGI program
-reads `regress/random.bin` through the seam of plan 001. A wrapper,
+reads `regress/random.bin` through the `cipher_random` seam. A wrapper,
 `regress/upstream-fixed.py`, patches `os.urandom` of the upstream server to read
 the same file, then runs the server. The harness sends identical requests to
 both and compares each `200` body byte for byte (TEST-ACCEPT-1, TEST-ACCEPT-3).

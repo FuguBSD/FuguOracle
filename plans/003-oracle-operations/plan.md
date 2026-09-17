@@ -28,7 +28,7 @@ code: the service learns no PIN and no secret (OVW-PURPOSE-1, OVW-PURPOSE-2).
 **One entry point.** `oracle_handle(op, envelope, len, &response, &outcome)`
 returns one of three decisions: a `200` response, a client error, or an internal
 failure. The outcome class is `ok_set`, `ok_get`, `junk`, `reject`, or `error`.
-The caller of plan 004 turns the decision into a status and logs the class.
+The caller in `main.c` turns the decision into a status and logs the class.
 
 **The order of checks is the order of the protocol.** First the envelope length
 and the block alignment (PROTO-ENVELOPE-1, PROTO-ENVELOPE-2). Then the tweak and

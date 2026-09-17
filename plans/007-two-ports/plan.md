@@ -16,7 +16,8 @@ The project delivers two OpenBSD ports in one submission:
 `security/libsecp256k1` and `security/fuguoracle` (`spec/packaging.md`). The
 second port carries the pkg-readme. The pkg-readme carries the operator text:
 the bring-up, the backup warning, and the key rotation procedure. It also
-carries the client provisioning and the live test before real use.
+carries the live test before real use, and it points to the manual page for the
+client provisioning.
 
 ## Constraints that shape the design
 

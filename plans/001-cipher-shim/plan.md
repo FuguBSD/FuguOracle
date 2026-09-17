@@ -43,7 +43,7 @@ no library header (ARCH-LAYOUT-2).
 **One random seam.** `cipher_random` wraps `arc4random_buf(3)`. A regress build,
 with `-DREGRESS`, reads the bytes from the file that the environment variable
 `FUGUORACLE_RANDOM` names, in draw order (SEC-RANDOM-2). The service build holds
-no such path. The byte-identity harness of plan 005 rests on this seam.
+no such path. The byte-identity harness `regress/interop` rests on this seam.
 
 **The memory rules apply from the first line.** Secrets live in stack buffers or
 in `freezero(3)` allocations. Every exit path clears them with
@@ -89,8 +89,9 @@ port.
 - The envelope seal with a fixed IV from the seam equals the `libwally` output
   (PROTO-ENCRYPT-4).
 - The public key recovery from the signed payload hash.
-- The record encrypt and decrypt of the 69-byte record plaintext, which PKCS#7
-  pads to an 80-byte ciphertext.
+- The record encrypt and decrypt of the 69-byte record plaintext. PKCS#7 pads
+  the plaintext to 80 bytes, and the 96-byte `enc` field holds the IV and the
+  ciphertext.
 - The seam returns the file bytes in order under `-DREGRESS`.
 
 ## Acceptance
