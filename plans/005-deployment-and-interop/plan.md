@@ -5,12 +5,13 @@
 Proposed. It waits on plan 004 for the two programs. Plan 006 and plan 007 wait
 on it. It needs the OpenBSD guest that the `fuguvm` tool supplies.
 
-Implements: ARCH-STACK, DEPLOY-HTTPD, DEPLOY-SERVICE, TEST-INTEROP, TEST-ACCEPT.
-Defers: DEPLOY-BACKUP, PKG-ORACLE, TEST-FUZZ.
+Implements: ARCH-STACK, DEPLOY-HTTPD, DEPLOY-SERVICE, SEC-SANDBOX, TEST-INTEROP,
+TEST-ACCEPT. Defers: DEPLOY-BACKUP, PKG-ORACLE, TEST-FUZZ.
 
-The rc.d script and the `httpd.conf` fragment land in the port directory, so
-plan 007 packages them without a move. The pkg-readme, the backup text, and the
-port build are the work of plan 007. The fuzzer is plan 006.
+The rc.d script lands SEC-SANDBOX-4, the one rule that plan 004 leaves open. The
+rc.d script and the `httpd.conf` fragment land in the port directory, so plan
+007 packages them without a move. The pkg-readme, the backup text, and the port
+build are the work of plan 007. The fuzzer is plan 006.
 
 ## Purpose
 

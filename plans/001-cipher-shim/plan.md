@@ -88,6 +88,9 @@ port.
   a wrong tag before any decryption (PROTO-ENCRYPT-3).
 - The envelope seal with a fixed IV from the seam equals the `libwally` output
   (PROTO-ENCRYPT-4).
+- The envelope open of a transcript pair of one client key: a `set_pin`
+  envelope, then a `get_pin` envelope with a higher `replay_counter`.
+  `regress/cgi.sh` replays that pair as a round trip.
 - The public key recovery from the signed payload hash.
 - The record encrypt and decrypt of the 69-byte record plaintext. PKCS#7 pads
   the plaintext to 80 bytes, and the 96-byte `enc` field holds the IV and the

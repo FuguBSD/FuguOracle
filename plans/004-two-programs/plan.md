@@ -2,17 +2,18 @@
 
 ## Status
 
-Proposed. It waits on plan 003 for the operations. Plan 005 waits on it.
+Proposed. It waits on plan 003 for the operations, and on plan 001 for the
+transcript pair of the round-trip test. Plan 005 waits on it.
 
-Implements: PROTO-HTTP, PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-SANDBOX,
-SEC-LOGGING. Implements: ARCH-LAYOUT, SEC-MEMORY, OPS-WIPE. Defers:
-DEPLOY-HTTPD, DEPLOY-SERVICE.
+Implements: PROTO-HTTP, PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-LOGGING.
+Implements: SEC-SANDBOX without SEC-SANDBOX-4. Implements: ARCH-LAYOUT,
+SEC-MEMORY, OPS-WIPE. Defers: DEPLOY-HTTPD, DEPLOY-SERVICE.
 
-Of the four shared units, this plan lands ARCH-LAYOUT-4, SEC-MEMORY-5,
-OPS-WIPE-3, and PROTO-RESPONSE-3, and each unit reaches `done`. Plan 003 lands
-the other two rules of PROTO-RESPONSE. The deployment files are the work of
-plan 005. This plan runs the program directly, with the CGI variables in the
-environment.
+Of the five shared units, this plan lands ARCH-LAYOUT-4, SEC-MEMORY-5,
+OPS-WIPE-3, and PROTO-RESPONSE-3, and those four units reach `done`. Plan 003
+lands the other two rules of PROTO-RESPONSE. The deployment files are the work
+of plan 005, and its rc.d script lands SEC-SANDBOX-4. This plan runs the program
+directly, with the CGI variables in the environment.
 
 ## Purpose
 
@@ -26,6 +27,12 @@ sandbox, and the log line. After it, the service answers a request.
 zero, then pledges. It unveils the key path and the record directory, and
 pledges again with the reduced set (SEC-SANDBOX-1 to SEC-SANDBOX-3). The program
 reads no request byte before that.
+
+**The two paths are constants.** `KEY_PATH` and `PINS_DIR` are compile-time
+constants (D-06, PROG-CGI-4). The regress build compiles the program with its
+own key path constant and its own `PINS_DIR` constant, both directories of the
+regress tree. Each path stays a compile-time constant. `regress/cgi.sh` writes
+the static private key of the vectors to that key path before the run.
 
 **The dispatch reads two variables.** `REQUEST_METHOD` and `DOCUMENT_URI` name
 the endpoint (PROG-CGI-1). `CONTENT_LENGTH` must be a decimal number of at most
@@ -79,8 +86,10 @@ environment and the body on standard input, and holds:
 - Malformed JSON, bad base64, a duplicate `data` member, and a short envelope
   answer `400`.
 - A `set_pin` and a `get_pin` round trip answer `200` with the header of
-  PROTO-HTTP-6. The test reads a request envelope of the known-answer vectors
-  from `regress/vectors.h`, encodes it as base64, and sends it as the body.
+  PROTO-HTTP-6. The test reads the transcript pair of one client key from
+  `regress/vectors.h`, and sends each request envelope as base64. The
+  `replay_counter` of the `get_pin` envelope is above the counter of the
+  `set_pin` envelope.
 - The log line holds the outcome class and no hex of the request.
 - The line count of the C sources stays near the target of ARCH-LAYOUT-4.
 
@@ -90,7 +99,8 @@ and the owner `_fuguoracle`, refuses a second run, and prints 66 hex digits.
 ## Acceptance
 
 - `make check` passes on the host, and `regress/guest` passes in the guest.
-- Every cited unit reads `done`.
+- Every cited unit reads `done`, except SEC-SANDBOX, which reads `partial` with
+  SEC-SANDBOX-4 as the absent part.
 - The change deletes this plan.
 
 The round trip through `httpd(8)` and `slowcgi(8)` belongs to plan 005, which

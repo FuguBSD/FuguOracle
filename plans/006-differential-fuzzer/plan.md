@@ -68,5 +68,5 @@ The fuzzer is a test tool, and its own proof is one run:
 
 ## What this plan does not do
 
-It changes no server. A disagreement that it finds is a defect report for plan
-003 or for the upstream project, never a fix in this plan.
+It changes no server. A disagreement that it finds is a defect report for
+`oracle.c` or for the upstream project, never a fix in this plan.
