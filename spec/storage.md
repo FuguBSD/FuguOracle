@@ -70,7 +70,9 @@ The record plaintext has 69 bytes, padded with PKCS#7 to 80 bytes:
 - **STORE-ATOMIC-3** — A write that creates or updates a record must be atomic.
   The steps are `mkstemp(3)` in `PINS_DIR`, write the 129 bytes, `fsync(2)`,
   `rename(2)` over the target, then `fsync` the directory file descriptor. A
-  crashed request must not leave a torn record. The third-strike wipe is the one
+  crashed request must not leave a torn record. A failure of the directory
+  `fsync` is a persist failure ([OPS-GET-7](operations.md#ops-get)), and the
+  target then already holds the new record. The third-strike wipe is the one
   exception: it overwrites the record in place
   ([OPS-WIPE-1](operations.md#ops-wipe)), because the wipe targets the existing
   blocks.

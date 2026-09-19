@@ -13,25 +13,36 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# The regression tests. `make regress` builds kat and runs it. The
-# vectors are committed as hex, so the run needs no Python and no
-# network (TEST-KAT-2).
+# The regression tests. `make regress` builds kat and unit, and it
+# runs each of them. The vectors are committed as hex, so the run
+# needs no Python and no network (TEST-KAT-2).
 #
 # The regress build defines REGRESS, so each draw of the seam comes
 # from the file that FUGUORACLE_RANDOM names (SEC-RANDOM-2). The
-# context blinding of SEC-RANDOM-3 draws outside the seam.
+# context blinding of SEC-RANDOM-3 draws outside the seam. The
+# regress build also holds the record store hook, which gives a
+# test control at one step of a store and of a wipe
+# (ARCH-LAYOUT-5).
+#
+# The unit tests write records, so this build names a record
+# directory of the regress tree. The path stays a compile-time
+# constant (D-06), and unit.c empties that directory before each
+# case.
 
-PROG=		kat
-SRCS=		kat.c cipher.c
+PROGS=		kat unit
+SRCS_kat=	kat.c cipher.c
+SRCS_unit=	unit.c pindb.c cipher.c
 
 .PATH:		${.CURDIR}/..
 
 LOCALBASE?=	/usr/local
 
 CFLAGS+=	-Wall -Wextra -Werror -DREGRESS
+CFLAGS+=	-DPINS_DIR='"${.OBJDIR}/pins"'
 CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/.. -I${LOCALBASE}/include
 LDFLAGS+=	-static -L${LOCALBASE}/lib
 LDADD=		-lsecp256k1 -lcrypto
 DPADD=		${LOCALBASE}/lib/libsecp256k1.a ${LIBCRYPTO}
+CLEANFILES+=	pins/* unit.random.*
 
 .include <bsd.regress.mk>
