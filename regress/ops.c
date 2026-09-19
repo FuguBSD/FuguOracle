@@ -840,6 +840,78 @@ t_set_replay(void)
 }
 
 /*
+ * A set_pin over a corrupt record is an internal failure, and the
+ * record file survives it (OPS-SET-2, OPS-SET-7). The service must
+ * not overwrite a record that it cannot read. The case breaks the
+ * authenticator, like the get_pin case of t_missing_and_corrupt.
+ *
+ * The load fails before the first draw of the service, so this case
+ * moves the fixed source by the IV of the client seal alone.
+ */
+static void
+t_set_corrupt(void)
+{
+	uint8_t	 env[ENV_MAX];
+	uint8_t	 raw[PINDB_RECORD_LEN + 1];
+	uint8_t	 after[PINDB_RECORD_LEN + 1];
+	uint8_t	 want[CIPHER_KEY_LEN];
+	size_t	 len;
+
+	provision(want);
+	ok("the record of the corrupt set_pin",
+	    record_bytes(raw, sizeof(raw)) == PINDB_RECORD_LEN);
+	raw[R_HMAC] ^= 0x80;
+	record_put(raw, PINDB_RECORD_LEN);
+
+	len = request(1, secret, 1, env, sizeof(env));
+	fails("a corrupt record on set_pin", ORACLE_OP_SET, env, len,
+	    ORACLE_FAILURE, ORACLE_OUT_ERROR);
+	ok("the corrupt record survives the set_pin",
+	    record_bytes(after, sizeof(after)) == PINDB_RECORD_LEN);
+	ok("the corrupt record keeps its bytes",
+	    memcmp(after, raw, PINDB_RECORD_LEN) == 0);
+}
+
+/*
+ * A set_pin over a record with one strike clears the count
+ * (OPS-SET-4). The wrong PIN of the case leaves that strike.
+ *
+ * The draws follow two rows of the draw table: the third row for the
+ * wrong PIN, and then the first row for the set_pin.
+ */
+static void
+t_set_count(void)
+{
+	struct oracle_response	 res;
+	struct pindb_record	 rec;
+	uint8_t			 env[ENV_MAX];
+	uint8_t			 want[CIPHER_KEY_LEN];
+	size_t			 len;
+
+	provision(want);
+
+	/* One wrong PIN burns one attempt. */
+	len = request(1, wrong, 1, env, sizeof(env));
+	draw(NULL, CIPHER_IV_LEN);	/* the storage IV */
+	draw(NULL, CIPHER_KEY_LEN);	/* the junk key */
+	draw(NULL, CIPHER_IV_LEN);	/* the response IV */
+	responds("the wrong PIN before a set_pin", ORACLE_OP_GET, env, len,
+	    &res, ORACLE_OUT_JUNK);
+	ok("the record before the set_pin", record_state(&rec) == 0);
+	ok("the count before the set_pin", rec.count == 1);
+
+	/* The set_pin of a higher counter clears that count. */
+	len = request(2, secret, 1, env, sizeof(env));
+	draw(NULL, CIPHER_KEY_LEN);	/* server_random32 */
+	draw(NULL, CIPHER_IV_LEN);	/* the storage IV */
+	draw(NULL, CIPHER_IV_LEN);	/* the response IV */
+	responds("the set_pin over a strike", ORACLE_OP_SET, env, len, &res,
+	    ORACLE_OUT_OK_SET);
+	ok("the record after the set_pin", record_state(&rec) == 0);
+	ok("the set_pin clears the count", rec.count == 0);
+}
+
+/*
  * A wrong PIN twice, then the correct PIN: two junk answers, then
  * the real key, and then a record without a strike (OPS-GET-5).
  *
@@ -1345,6 +1417,8 @@ main(void)
 	t_client();
 	t_forms();
 	t_set_replay();
+	t_set_corrupt();
+	t_set_count();
 	t_wrong_pin();
 	t_third_strike();
 	t_get_replay();
