@@ -20,7 +20,11 @@
  * ARCH-LAYOUT-2).
  *
  * Every function but cipher_random() returns 0, or -1 on a failure.
- * A failure leaves no plaintext and no key in an output buffer.
+ * A failure writes no plaintext and no key to an output buffer. The
+ * two open functions differ in one point: cipher_record_open()
+ * clears the whole caller buffer on each failure, and
+ * cipher_envelope_open() leaves the buffer untouched until the tag
+ * answers. Each contract below states the rule of its function.
  */
 
 #ifndef CIPHER_H
@@ -50,8 +54,9 @@
 
 /*
  * cipher_random(buf, len):
- *	Fill buf with len random bytes (SEC-RANDOM-1). Every draw of
- *	the program comes through this one seam (SEC-RANDOM-2).
+ *	Fill buf with len random bytes (SEC-RANDOM-1). Each draw of
+ *	the program comes through this one seam, except the context
+ *	blinding of SEC-RANDOM-3 (SEC-RANDOM-2).
  */
 void	cipher_random(void *, size_t);
 
@@ -68,6 +73,18 @@ int	cipher_sha256(const uint8_t *, size_t, uint8_t *);
  */
 int	cipher_hmac_sha256(const uint8_t *, size_t, const uint8_t *, size_t,
 	    uint8_t *);
+
+#ifdef REGRESS
+/*
+ * cipher_tweak_input(cke, counter, out):
+ *	The tweak input m of PROTO-TWEAK-1. cke is a public key of
+ *	CIPHER_PUBKEY_LEN bytes, counter is the replay counter, and
+ *	out holds CIPHER_HASH_LEN bytes. cipher_tweak_key() derives m
+ *	inside the shim, so the regress build holds this entry point
+ *	(ARCH-LAYOUT-5).
+ */
+int	cipher_tweak_input(const uint8_t *, uint32_t, uint8_t *);
+#endif
 
 /*
  * cipher_tweak_key(priv, cke, counter, out):
@@ -119,11 +136,15 @@ int	cipher_ecdh_secret(const uint8_t *, const uint8_t *, uint8_t *);
  * cipher_envelope_open(enc_key, mac_key, env, env_len, out, out_size,
  *     out_len):
  *	The plaintext of an envelope. The tag check runs before the
- *	decryption (PROTO-ENCRYPT-3), and a wrong tag leaves out
- *	untouched. out_size counts at least env_len minus
- *	CIPHER_ENVELOPE_OVERHEAD bytes, because the EVP layer needs
- *	the room of the ciphertext. out_len takes the plaintext
- *	length.
+ *	decryption (PROTO-ENCRYPT-3). A wrong length, a failure of the
+ *	tag step and a wrong tag each leave out untouched, and that
+ *	answer is the evidence of the order. A failure of the
+ *	decryption clears out_size bytes, because the buffer can then
+ *	hold a part of a plaintext. A caller that reuses a buffer must
+ *	clear it before the call. out_size counts at least env_len
+ *	minus CIPHER_ENVELOPE_OVERHEAD bytes, because the EVP layer
+ *	needs the room of the ciphertext. out_len takes the
+ *	plaintext length.
  */
 int	cipher_envelope_open(const uint8_t *, const uint8_t *,
 	    const uint8_t *, size_t, uint8_t *, size_t, size_t *);
@@ -152,7 +173,9 @@ int	cipher_recover_pubkey(const uint8_t *, const uint8_t *, uint8_t *);
  * cipher_record_open(key, enc, enc_len, out, out_size, out_len):
  *	The plaintext of a record enc field (STORE-RECORD). The field
  *	holds the IV and the ciphertext, and it carries no tag: the
- *	record authenticator covers it. out_size counts at least
+ *	record authenticator covers it. Each failure clears out_size
+ *	bytes, so a failed call destroys the earlier contents of a
+ *	buffer that the caller reuses. out_size counts at least
  *	enc_len minus CIPHER_IV_LEN bytes, and out_len takes the
  *	plaintext length.
  */

@@ -17,8 +17,9 @@
 # vectors are committed as hex, so the run needs no Python and no
 # network (TEST-KAT-2).
 #
-# The regress build defines REGRESS, so each draw comes from the file
-# that FUGUORACLE_RANDOM names (SEC-RANDOM-2).
+# The regress build defines REGRESS, so each draw of the seam comes
+# from the file that FUGUORACLE_RANDOM names (SEC-RANDOM-2). The
+# context blinding of SEC-RANDOM-3 draws outside the seam.
 
 PROG=		kat
 SRCS=		kat.c cipher.c

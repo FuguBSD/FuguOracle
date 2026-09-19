@@ -111,4 +111,4 @@ fuguoracle/
   of C.
 - **ARCH-LAYOUT-5** — The shim can hold an entry point that serves the tests
   alone. `#ifdef REGRESS` must guard each such entry point. The service program
-  then carries no test code, and no code that only a client needs.
+  must not carry test code, and it must not carry code that only a client needs.

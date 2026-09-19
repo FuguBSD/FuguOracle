@@ -145,25 +145,20 @@ zeroed(const char *name, const uint8_t *buf, size_t len)
 }
 
 /*
- * The tweak input m of one request (PROTO-TWEAK-1). The counter
- * travels in little-endian byte order, so a byte order error fails
- * here.
+ * The tweak input m of one request (PROTO-TWEAK-1). The shim derives
+ * m, and the tweak of the key reads the same derivation, so a wrong
+ * counter byte order in the shim fails here.
  */
 static void
 m_is(const char *name, const char *cke_hex, uint32_t counter,
     const char *m_hex)
 {
 	struct blob	 cke, want;
-	uint8_t		 le[4];
-	uint8_t		 mac[CIPHER_HASH_LEN], m[CIPHER_HASH_LEN];
-	size_t		 i;
+	uint8_t		 m[CIPHER_HASH_LEN];
 
 	blob(&cke, cke_hex);
 	blob(&want, m_hex);
-	for (i = 0; i < sizeof(le); i++)
-		le[i] = (uint8_t)(counter >> (8 * i));
-	ok(name, cipher_hmac_sha256(cke.b, cke.len, le, sizeof(le), mac) == 0);
-	ok(name, cipher_sha256(mac, sizeof(mac), m) == 0);
+	ok(name, cipher_tweak_input(cke.b, counter, m) == 0);
 	same(name, m, sizeof(m), &want);
 }
 
@@ -398,9 +393,10 @@ t_recover(void)
 static void
 t_hash(void)
 {
-	struct blob	 msg, key, env, pin, want;
+	struct blob	 msg, key, env, pin, entropy, want;
 	uint8_t		 out[CIPHER_HASH_LEN];
-	uint8_t		 signed_message[HEADER_LEN + CIPHER_KEY_LEN];
+	uint8_t		 get_message[HEADER_LEN + CIPHER_KEY_LEN];
+	uint8_t		 set_message[HEADER_LEN + 2 * CIPHER_KEY_LEN];
 
 	blob(&msg, V_HASH_MESSAGE);
 	blob(&want, V_HASH_SHA256);
@@ -415,17 +411,35 @@ t_hash(void)
 
 	/*
 	 * The envelope of the get_pin request opens with its cke and
-	 * its counter, and those bytes lead the signed message
-	 * (PROTO-PAYLOAD-3).
+	 * its counter, and those bytes lead the signed message. The
+	 * 97-byte form carries no entropy, so the message holds 69
+	 * bytes (PROTO-PAYLOAD-3).
 	 */
 	blob(&env, V_GET_ENVELOPE);
 	blob(&pin, V_PIN_SECRET);
 	blob(&want, V_GET_MSGHASH);
-	memcpy(signed_message, env.b, HEADER_LEN);
-	memcpy(signed_message + HEADER_LEN, pin.b, CIPHER_KEY_LEN);
-	ok("the signed message", cipher_sha256(signed_message,
-	    sizeof(signed_message), out) == 0);
-	same("the signed message", out, sizeof(out), &want);
+	memcpy(get_message, env.b, HEADER_LEN);
+	memcpy(get_message + HEADER_LEN, pin.b, CIPHER_KEY_LEN);
+	ok("the get_pin signed message", cipher_sha256(get_message,
+	    sizeof(get_message), out) == 0);
+	same("the get_pin signed message", out, sizeof(out), &want);
+
+	/*
+	 * The 129-byte form of the set_pin request adds the entropy
+	 * after the pin_secret, so its signed message holds 101 bytes
+	 * (PROTO-PAYLOAD-3).
+	 */
+	blob(&env, V_SET_ENVELOPE);
+	blob(&pin, V_PIN_SECRET);
+	blob(&entropy, V_ENTROPY);
+	blob(&want, V_SET_MSGHASH);
+	memcpy(set_message, env.b, HEADER_LEN);
+	memcpy(set_message + HEADER_LEN, pin.b, CIPHER_KEY_LEN);
+	memcpy(set_message + HEADER_LEN + CIPHER_KEY_LEN, entropy.b,
+	    CIPHER_KEY_LEN);
+	ok("the set_pin signed message", cipher_sha256(set_message,
+	    sizeof(set_message), out) == 0);
+	same("the set_pin signed message", out, sizeof(out), &want);
 }
 
 /*

@@ -111,9 +111,9 @@ tool forwards the guest SSH port only.
 - **TEST-ACCEPT-1** — Acceptance is behavioral equality with the upstream server
   for well-formed requests. Both give the same reject, junk, or real decision.
   Both give byte-identical `200` response bodies for identical input and
-  identical stored state. Test builds route every draw through the random seam
-  ([SEC-RANDOM-2](security.md#sec-random)), and the harness patches the same
-  fixed source into the upstream `os.urandom` (see D-12).
+  identical stored state. Test builds route each draw of the table below through
+  the random seam ([SEC-RANDOM-2](security.md#sec-random)). The harness patches
+  the same fixed source into the upstream `os.urandom` (see D-12).
 - **TEST-ACCEPT-2** — The service must draw random bytes in the upstream order
   of the draw table below, so that fixed-source outputs align.
 - **TEST-ACCEPT-3** — The harness must keep the fixed random source as one
@@ -128,5 +128,7 @@ tool forwards the guest SSH port only.
 | `get_pin`, wrong PIN, and the third strike                     | storage IV (16), junk key (32), response IV (16)          |
 | `get_pin`, missing record, corrupt record, or replay violation | junk key (32), response IV (16)                           |
 
-`mkstemp(3)` draws file names outside the seam: record bytes on disk are out of
-the byte-identity scope.
+Two draws stay outside the seam. `mkstemp(3)` draws file names: record bytes on
+disk are out of the byte-identity scope. The context blinding of
+[SEC-RANDOM-3](security.md#sec-random) draws 32 bytes: it changes no answer of
+the library.

@@ -63,6 +63,8 @@ static int			 aes_cbc(const uint8_t *, const uint8_t *,
 static int			 ecdh_secret(const uint8_t *, const uint8_t *,
 				    uint8_t *);
 static size_t			 padded(size_t);
+static int			 tweak_input(const uint8_t *, uint32_t,
+				    uint8_t *);
 static int			 tweak_scalar(const uint8_t *,
 				    const uint8_t *, uint32_t, uint8_t *);
 
@@ -169,11 +171,12 @@ cipher_random(void *buf, size_t len)
 {
 #ifdef REGRESS
 	/*
-	 * The regress build reads the draws of the program from the
-	 * file that FUGUORACLE_RANDOM names, in draw order
-	 * (SEC-RANDOM-2). The service build holds no such path. A
-	 * missing or a short file is a fault of the test, and the
-	 * program stops on it.
+	 * The regress build reads each draw of the seam from the file
+	 * that FUGUORACLE_RANDOM names, in draw order (SEC-RANDOM-2).
+	 * The context blinding of SEC-RANDOM-3 draws outside the
+	 * seam. The service build holds no such path. A missing or a
+	 * short file is a fault of the test, and the program stops
+	 * on it.
 	 */
 	static int	 fd = -1;
 	const char	*path;
@@ -220,6 +223,46 @@ cipher_hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *msg,
 }
 
 /*
+ * The tweak input m = H(HMAC(key = cke, msg = replay_counter)) of one
+ * request (PROTO-TWEAK-1). The counter travels in little-endian byte
+ * order. cke holds CIPHER_PUBKEY_LEN bytes, and out takes
+ * CIPHER_HASH_LEN bytes.
+ */
+static int
+tweak_input(const uint8_t *cke, uint32_t counter, uint8_t *out)
+{
+	uint32_t	 le;
+	uint8_t		 mac[CIPHER_HASH_LEN];
+	int		 rc = -1;
+
+	le = htole32(counter);
+	if (cipher_hmac_sha256(cke, CIPHER_PUBKEY_LEN, (const uint8_t *)&le,
+	    sizeof(le), mac) != 0)
+		goto out;
+	if (cipher_sha256(mac, sizeof(mac), out) != 0)
+		goto out;
+	rc = 0;
+out:
+	explicit_bzero(mac, sizeof(mac));
+	if (rc != 0)
+		explicit_bzero(out, CIPHER_HASH_LEN);
+	return rc;
+}
+
+#ifdef REGRESS
+/*
+ * The tweak input alone, for the known-answer test of PROTO-TWEAK-1.
+ * The service reads m inside the tweak only, so the regress build
+ * holds this entry point (ARCH-LAYOUT-5).
+ */
+int
+cipher_tweak_input(const uint8_t *cke, uint32_t counter, uint8_t *out)
+{
+	return tweak_input(cke, counter, out);
+}
+#endif
+
+/*
  * The scalar t of one request, for the x-only server key that the
  * caller serialized (PROTO-TWEAK-2). The private side and the public
  * side of the tweak add the same scalar, so they share this step.
@@ -231,28 +274,21 @@ tweak_scalar(const uint8_t *xonly, const uint8_t *cke, uint32_t counter,
     uint8_t *out)
 {
 	secp256k1_context	*ctx;
-	uint32_t		 le;
-	uint8_t			 mac[CIPHER_HASH_LEN];
 	uint8_t			 tagged[CIPHER_XONLY_LEN + CIPHER_HASH_LEN];
 	int			 rc = -1;
 
 	if ((ctx = context()) == NULL)
 		goto out;
 
-	/* m = H(HMAC(key = cke, msg = replay_counter)) (PROTO-TWEAK-1). */
-	le = htole32(counter);
-	if (cipher_hmac_sha256(cke, CIPHER_PUBKEY_LEN, (const uint8_t *)&le,
-	    sizeof(le), mac) != 0)
-		goto out;
+	/* The tagged hash covers the x-only key and m (PROTO-TWEAK-1). */
 	memcpy(tagged, xonly, CIPHER_XONLY_LEN);
-	if (cipher_sha256(mac, sizeof(mac), tagged + CIPHER_XONLY_LEN) != 0)
+	if (tweak_input(cke, counter, tagged + CIPHER_XONLY_LEN) != 0)
 		goto out;
 	if (secp256k1_tagged_sha256(ctx, out, (const uint8_t *)TAPTWEAK,
 	    sizeof(TAPTWEAK) - 1, tagged, sizeof(tagged)) != 1)
 		goto out;
 	rc = 0;
 out:
-	explicit_bzero(mac, sizeof(mac));
 	explicit_bzero(tagged, sizeof(tagged));
 	if (rc != 0)
 		explicit_bzero(out, CIPHER_HASH_LEN);
