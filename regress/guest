@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Copyright (c) 2026 Dick Olsson <hi@senzilla.io>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# guest: build the library and the tests in the OpenBSD guest, and run
+# them there (ARCH-DEPS-5).
+#
+# usage: guest <libsecp256k1 tarball>
+#
+# The ports tree holds no libsecp256k1, so the guest builds the
+# library from an upstream release tarball. The developer fetches that
+# tarball from the address that spec/packaging.md names, and gives its
+# path to this script.
+#
+# The script drives the guest with fuguvm, as a command only
+# (TEST-INTEROP-4). FUGUVM names that command. The script stops at the
+# first failure, and it prints the output of each step.
+
+set -e
+
+FUGUVM=${FUGUVM:-fuguvm}
+
+# The work directory of the guest. It sits on /home, because the root
+# partition of the guest holds a few megabytes only.
+WORK=/home/fuguoracle
+
+# The source that the guest builds. A new source file joins this list.
+SOURCE="Makefile cipher.c cipher.h regress"
+
+# The autotools that build the library. The release tarball holds no
+# configure script, and the base system holds no autotools.
+PACKAGES="autoconf%2.71 automake%1.16 libtool"
+VERSIONS="AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16"
+
+# The modules of PKG-SECP-1: ecdh, recovery and extrakeys, and no
+# other module. The program links the static archive (ARCH-DEPS-4).
+CONFIGURE="--prefix=/usr/local --disable-shared --enable-static \
+	--disable-benchmark --disable-tests --disable-exhaustive-tests \
+	--enable-module-ecdh --enable-module-recovery \
+	--enable-module-extrakeys --disable-module-schnorrsig \
+	--disable-module-ellswift --disable-module-musig \
+	--disable-module-silentpayments"
+
+if [ $# -ne 1 ] || [ ! -f "$1" ]; then
+	echo "usage: guest <libsecp256k1 tarball>" >&2
+	exit 1
+fi
+tarball=$1
+root=$(dirname "$0")/..
+
+echo "guest: the source"
+$FUGUVM up
+$FUGUVM wait
+$FUGUVM ssh -- sh -c "rm -rf $WORK/src $WORK/library; mkdir -p $WORK/src"
+$FUGUVM put "$tarball" "$WORK/library.tar.gz"
+for item in $SOURCE; do
+	$FUGUVM put "$root/$item" "$WORK/src/$item"
+done
+
+echo "guest: the library"
+$FUGUVM ssh -- sh -c "set -e; pkg_add -I $PACKAGES; cd $WORK; \
+	mkdir library; tar xzf library.tar.gz -C library; cd library/*; \
+	$VERSIONS ./autogen.sh; ./configure $CONFIGURE; make; make install"
+
+echo "guest: the shim"
+$FUGUVM ssh -- sh -c "cd $WORK/src; make cipher.o"
+
+echo "guest: the known-answer tests"
+$FUGUVM ssh -- sh -c "cd $WORK/src/regress; make regress"

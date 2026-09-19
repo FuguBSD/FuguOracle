@@ -109,3 +109,9 @@ fuguoracle/
 - **ARCH-LAYOUT-3** — The build must use `-Wall -Wextra -Werror`.
 - **ARCH-LAYOUT-4** — The target size of the implementation is about 1,500 lines
   of C.
+- **ARCH-LAYOUT-5** — The shim can hold an entry point that the tests alone
+  reach. `#ifdef REGRESS` must guard each such entry point. Such an entry point
+  can compute a client answer, because a known-answer vector must pin both sides
+  of a request (see [PROTO-TWEAK-4](protocol.md#proto-tweak)). The service
+  program must not carry test code, and it must not carry code that only a
+  client needs.

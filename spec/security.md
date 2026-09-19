@@ -68,8 +68,16 @@ if (pledge("stdio rpath wpath cpath flock", NULL) == -1) err(1, "pledge");
 - **SEC-RANDOM-1** — All random bytes must come from `arc4random_buf(3)`: IVs,
   junk keys, server entropy, and key generation. It needs no seeding, and it
   works inside the chroot.
-- **SEC-RANDOM-2** — All random calls must route through one seam. Only regress
+- **SEC-RANDOM-2** — All random calls must route through one seam. Two draws
+  stay outside it: the context blinding of SEC-RANDOM-3, and the file names that
+  `mkstemp(3)` draws for [STORE-ATOMIC-3](storage.md#store-atomic). Only regress
   builds can override the seam, to give tests a fixed random source (see D-12).
+- **SEC-RANDOM-3** — The program must randomize the `libsecp256k1` context with
+  `secp256k1_context_randomize`, at the creation of the context. This step
+  protects the operations on `d` and `d'` against a side channel. The 32 bytes
+  must come from `arc4random_buf(3)` directly, and not from the seam of
+  SEC-RANDOM-2. The step changes no answer of the library, so the fixed draw
+  table of a regress build keeps its order.
 
 <a id="sec-logging"></a>
 
