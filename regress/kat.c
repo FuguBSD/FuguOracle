@@ -57,6 +57,8 @@ static void	 same(const char *, const uint8_t *, size_t,
 		     const struct blob *);
 static void	 ok(const char *, int);
 static void	 parity_is(const char *, int, int);
+static void	 zeroed(const char *, const uint8_t *, size_t);
+static void	 m_is(const char *, const char *, uint32_t, const char *);
 static void	 keys(const char *, uint32_t, const char *, uint8_t *,
 		     uint8_t *, uint8_t *);
 static void	 tweaked(const char *, const char *, uint32_t, const char *,
@@ -128,6 +130,43 @@ parity_is(const char *name, int got, int want)
 	failures++;
 }
 
+/* A buffer holds no byte of a secret (SEC-MEMORY-2). */
+static void
+zeroed(const char *name, const uint8_t *buf, size_t len)
+{
+	size_t	 i;
+
+	for (i = 0; i < len; i++)
+		if (buf[i] != 0) {
+			warnx("%s: the buffer holds byte %zu", name, i);
+			failures++;
+			return;
+		}
+}
+
+/*
+ * The tweak input m of one request (PROTO-TWEAK-1). The counter
+ * travels in little-endian byte order, so a byte order error fails
+ * here.
+ */
+static void
+m_is(const char *name, const char *cke_hex, uint32_t counter,
+    const char *m_hex)
+{
+	struct blob	 cke, want;
+	uint8_t		 le[4];
+	uint8_t		 mac[CIPHER_HASH_LEN], m[CIPHER_HASH_LEN];
+	size_t		 i;
+
+	blob(&cke, cke_hex);
+	blob(&want, m_hex);
+	for (i = 0; i < sizeof(le); i++)
+		le[i] = (uint8_t)(counter >> (8 * i));
+	ok(name, cipher_hmac_sha256(cke.b, cke.len, le, sizeof(le), mac) == 0);
+	ok(name, cipher_sha256(mac, sizeof(mac), m) == 0);
+	same(name, m, sizeof(m), &want);
+}
+
 /*
  * The request key d' of one transcript request, and the two envelope
  * keys of one direction. dprime, enc and mac each take a key.
@@ -178,6 +217,7 @@ t_tweak(void)
 	blob(&priv, V_STATIC_PRIV);
 	blob(&cke, V_TWEAK_CKE);
 	blob(&want, V_TWEAK_DPRIME);
+	m_is("the tweak input", V_TWEAK_CKE, V_TWEAK_COUNTER, V_TWEAK_M);
 	ok("tweak", cipher_tweak_key(priv.b, cke.b, V_TWEAK_COUNTER,
 	    dprime) == 0);
 	same("tweak", dprime, sizeof(dprime), &want);
@@ -190,10 +230,16 @@ static void
 t_kdf(void)
 {
 	struct blob	 priv, cke, want;
+	uint8_t		 shared[CIPHER_HASH_LEN];
 	uint8_t		 enc[CIPHER_KEY_LEN], mac[CIPHER_KEY_LEN];
 
 	blob(&priv, V_TWEAK_DPRIME);
 	blob(&cke, V_TWEAK_CKE);
+
+	/* The one secret that both labels split (PROTO-ENCRYPT-5). */
+	blob(&want, V_TWEAK_SHARED);
+	ok("the shared secret", cipher_ecdh_secret(priv.b, cke.b, shared) == 0);
+	same("the shared secret", shared, sizeof(shared), &want);
 
 	ok("request keys", cipher_ecdh_keys(priv.b, cke.b,
 	    CIPHER_LABEL_REQUEST, enc, mac) == 0);
@@ -247,6 +293,7 @@ t_open(void)
 
 	blob(&payload, V_SET_PAYLOAD);
 	ok("the set_pin payload holds 129 bytes", payload.len == 129);
+	m_is("the set_pin tweak input", V_SET_CKE, V_SET_COUNTER, V_SET_M);
 	open_request("set_pin open", V_SET_CKE, V_SET_COUNTER, V_SET_DPRIME,
 	    V_SET_ENC, V_SET_PAYLOAD);
 	tweaked("the set_pin tweaked key", V_SET_CKE, V_SET_COUNTER,
@@ -254,6 +301,7 @@ t_open(void)
 
 	blob(&payload, V_GET_PAYLOAD);
 	ok("the get_pin payload holds 97 bytes", payload.len == 97);
+	m_is("the get_pin tweak input", V_GET_CKE, V_GET_COUNTER, V_GET_M);
 	open_request("get_pin open", V_GET_CKE, V_GET_COUNTER, V_GET_DPRIME,
 	    V_GET_ENC, V_GET_PAYLOAD);
 	tweaked("the get_pin tweaked key", V_GET_CKE, V_GET_COUNTER,
@@ -298,6 +346,23 @@ t_reject(void)
 	    CIPHER_ENVELOPE_OVERHEAD, out, sizeof(out), &len) == -1);
 	ok("a ciphertext beside the block", cipher_envelope_open(enc, mac,
 	    env.b, env.len - 1, out, sizeof(out), &len) == -1);
+
+	/*
+	 * A tag that answers, and a padding that does not. The change
+	 * of the last byte of the second last block breaks the last
+	 * pad byte, and a fresh tag covers the change. The decryption
+	 * runs and writes a part of the plaintext, so the failure
+	 * clears the buffer.
+	 */
+	blob(&env, V_GET_ENC);
+	env.b[env.len - CIPHER_TAG_LEN - CIPHER_BLOCK_LEN - 1] ^= 0x01;
+	ok("a bad padding", cipher_hmac_sha256(mac, CIPHER_KEY_LEN, env.b,
+	    env.len - CIPHER_TAG_LEN, env.b + env.len - CIPHER_TAG_LEN) == 0);
+	memset(out, 0xa5, sizeof(out));
+	ok("a bad padding", cipher_envelope_open(enc, mac, env.b, env.len,
+	    out, sizeof(out), &len) == -1);
+	ok("a bad padding writes no length", len == 0);
+	zeroed("a bad padding", out, sizeof(out));
 }
 
 /* The client public key of the signed payload hash (PROTO-PAYLOAD-4). */
@@ -401,6 +466,7 @@ t_record(void)
 {
 	struct blob	 key, enc, want;
 	uint8_t		 out[BLOB_MAX];
+	uint8_t		 small[CIPHER_BLOCK_LEN];
 	size_t		 len;
 
 	blob(&key, V_RECORD_KEY);
@@ -419,10 +485,26 @@ t_record(void)
 	ok("the padded ciphertext holds 80 bytes",
 	    len == CIPHER_IV_LEN + 80);
 
+	/*
+	 * A failure of the open clears the output buffer, because a
+	 * caller can reuse a buffer that holds an earlier plaintext.
+	 */
+	ok("record open", cipher_record_open(key.b, enc.b, enc.len, out,
+	    sizeof(out), &len) == 0);
 	ok("a short enc field", cipher_record_open(key.b, enc.b,
 	    CIPHER_IV_LEN, out, sizeof(out), &len) == -1);
+	zeroed("a short enc field", out, sizeof(out));
+
+	ok("record open", cipher_record_open(key.b, enc.b, enc.len, out,
+	    sizeof(out), &len) == 0);
 	ok("an enc field beside the block", cipher_record_open(key.b, enc.b,
 	    enc.len - 1, out, sizeof(out), &len) == -1);
+	zeroed("an enc field beside the block", out, sizeof(out));
+
+	memset(small, 0xa5, sizeof(small));
+	ok("a small output buffer", cipher_record_open(key.b, enc.b, enc.len,
+	    small, sizeof(small), &len) == -1);
+	zeroed("a small output buffer", small, sizeof(small));
 }
 
 /*

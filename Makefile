@@ -13,27 +13,27 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# The build of the CGI program. OpenBSD make reads this file, and GNU
-# make reads GNUmakefile for the document gates.
+# The build of the source. OpenBSD make reads this file, and GNU make
+# reads GNUmakefile for the document gates.
 #
-# The program links static, because it runs inside the /var/www chroot
-# (ARCH-STACK-3). It links the archive of the port and the archive of
-# the base system, and it holds no shared library (ARCH-DEPS-4).
-# SRCS names the sources that exist: the link needs main.c.
+# The tree holds the shim alone, so the default target compiles it.
+# Plan 004 adds main.c, http.c and keygen.c, and this file then links
+# the two programs. They link static, because the service runs inside
+# the /var/www chroot (ARCH-STACK-3, ARCH-DEPS-4).
 #
-# `make cipher.o` compiles the shim alone, and `make -C regress
-# regress` runs the known-answer tests.
-
-PROG=		fuguoracle
-SRCS=		cipher.c
-NOMAN=
+# `make -C regress regress` builds the known-answer tests. It links
+# the archive of the port and the archive of the base system today.
 
 LOCALBASE?=	/usr/local
 
 CFLAGS+=	-Wall -Wextra -Werror
 CFLAGS+=	-I${LOCALBASE}/include
-LDFLAGS+=	-static -L${LOCALBASE}/lib
-LDADD=		-lsecp256k1 -lcrypto
-DPADD=		${LOCALBASE}/lib/libsecp256k1.a ${LIBCRYPTO}
 
-.include <bsd.prog.mk>
+OBJS=		cipher.o
+
+all: ${OBJS}
+
+cipher.o: cipher.c cipher.h
+
+clean:
+	rm -f ${OBJS}

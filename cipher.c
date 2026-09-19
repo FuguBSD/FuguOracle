@@ -60,24 +60,38 @@ static int			 hmac_evp(const EVP_MD *, const uint8_t *,
 static int			 aes_cbc(const uint8_t *, const uint8_t *,
 				    int, const uint8_t *, size_t, uint8_t *,
 				    size_t, size_t *);
+static int			 ecdh_secret(const uint8_t *, const uint8_t *,
+				    uint8_t *);
 static size_t			 padded(size_t);
 static int			 tweak_scalar(const uint8_t *,
 				    const uint8_t *, uint32_t, uint8_t *);
 
 /*
- * The library context. The shim does not randomize it, because a draw
- * here comes before the draws of the request, and the byte-identity
- * test needs the order of TEST-ACCEPT-2. The context holds no secret.
- * One process serves one request, so the context lives to the exit of
- * the program.
+ * The library context. The shim blinds it, because each request runs
+ * the static key d and the request key d' through it (SEC-RANDOM-3).
+ * The 32 blinding bytes come from arc4random_buf(3) here, and not
+ * from the seam of cipher_random(). The blinding changes no answer,
+ * and a draw outside the seam keeps the draw order that the
+ * byte-identity test needs (SEC-RANDOM-2, TEST-ACCEPT-2). One process
+ * serves one request, so the context lives to the exit of the
+ * program.
  */
 static secp256k1_context *
 context(void)
 {
 	static secp256k1_context	*ctx;
+	uint8_t				 seed[32];
 
-	if (ctx == NULL)
-		ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
+	if (ctx != NULL)
+		return ctx;
+	if ((ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE)) == NULL)
+		return NULL;
+	arc4random_buf(seed, sizeof(seed));
+	if (secp256k1_context_randomize(ctx, seed) != 1) {
+		secp256k1_context_destroy(ctx);
+		ctx = NULL;
+	}
+	explicit_bzero(seed, sizeof(seed));
 	return ctx;
 }
 
@@ -121,17 +135,17 @@ aes_cbc(const uint8_t *key, const uint8_t *iv, int encrypt,
     const uint8_t *in, size_t in_len, uint8_t *out, size_t out_size,
     size_t *out_len)
 {
-	EVP_CIPHER_CTX	*ctx;
+	EVP_CIPHER_CTX	*ctx = NULL;
 	int		 len, total;
 	int		 rc = -1;
 
 	*out_len = 0;
 	if (in_len > INT_MAX || out_size > INT_MAX)
-		return -1;
+		goto out;
 	if (out_size < (encrypt ? padded(in_len) : in_len))
-		return -1;
+		goto out;
 	if ((ctx = EVP_CIPHER_CTX_new()) == NULL)
-		return -1;
+		goto out;
 	if (EVP_CipherInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv,
 	    encrypt) != 1)
 		goto out;
@@ -287,6 +301,13 @@ out:
 	return rc;
 }
 
+#ifdef REGRESS
+/*
+ * The public tweak answers a client, because the service holds d
+ * (PROTO-TWEAK-4). The regress build compiles it, and the service
+ * program carries no client-side curve code (ARCH-LAYOUT-2,
+ * ARCH-LAYOUT-4, ARCH-LAYOUT-5).
+ */
 int
 cipher_tweak_pubkey(const uint8_t *pub, const uint8_t *cke, uint32_t counter,
     uint8_t *out, int *parity)
@@ -337,15 +358,18 @@ out:
 	}
 	return rc;
 }
+#endif
 
-int
-cipher_ecdh_keys(const uint8_t *priv, const uint8_t *pub, const char *label,
-    uint8_t *enc_key, uint8_t *mac_key)
+/*
+ * The ECDH secret of one private key and one public key. The default
+ * hash function of the library is the SHA-256 of the compressed
+ * shared point (PROTO-ENCRYPT-1). out holds CIPHER_HASH_LEN bytes.
+ */
+static int
+ecdh_secret(const uint8_t *priv, const uint8_t *pub, uint8_t *out)
 {
 	secp256k1_context	*ctx;
 	secp256k1_pubkey	 pubkey;
-	uint8_t			 shared[CIPHER_HASH_LEN];
-	uint8_t			 keys[CIPHER_KEY_LEN + CIPHER_KEY_LEN];
 	int			 rc = -1;
 
 	memset(&pubkey, 0, sizeof(pubkey));
@@ -354,13 +378,38 @@ cipher_ecdh_keys(const uint8_t *priv, const uint8_t *pub, const char *label,
 	if (secp256k1_ec_pubkey_parse(ctx, &pubkey, pub,
 	    CIPHER_PUBKEY_LEN) != 1)
 		goto out;
+	if (secp256k1_ecdh(ctx, out, &pubkey, priv, NULL, NULL) != 1)
+		goto out;
+	rc = 0;
+out:
+	if (rc != 0)
+		explicit_bzero(out, CIPHER_HASH_LEN);
+	return rc;
+}
 
-	/*
-	 * The default hash function of the library is the SHA-256 of
-	 * the compressed shared point (PROTO-ENCRYPT-1), and the
-	 * HMAC-SHA512 of the label splits it (PROTO-ENCRYPT-2).
-	 */
-	if (secp256k1_ecdh(ctx, shared, &pubkey, priv, NULL, NULL) != 1)
+#ifdef REGRESS
+/*
+ * The ECDH secret alone, for the known-answer test of
+ * PROTO-ENCRYPT-1. The service reads the two envelope keys only, so
+ * the regress build holds this entry point (ARCH-LAYOUT-5).
+ */
+int
+cipher_ecdh_secret(const uint8_t *priv, const uint8_t *pub, uint8_t *out)
+{
+	return ecdh_secret(priv, pub, out);
+}
+#endif
+
+int
+cipher_ecdh_keys(const uint8_t *priv, const uint8_t *pub, const char *label,
+    uint8_t *enc_key, uint8_t *mac_key)
+{
+	uint8_t	 shared[CIPHER_HASH_LEN];
+	uint8_t	 keys[CIPHER_KEY_LEN + CIPHER_KEY_LEN];
+	int	 rc = -1;
+
+	/* The HMAC-SHA512 of the label splits the secret (PROTO-ENCRYPT-2). */
+	if (ecdh_secret(priv, pub, shared) != 0)
 		goto out;
 	if (hmac_evp(EVP_sha512(), shared, sizeof(shared),
 	    (const uint8_t *)label, strlen(label), keys, sizeof(keys)) != 0)
@@ -485,15 +534,20 @@ cipher_record_open(const uint8_t *key, const uint8_t *enc, size_t enc_len,
     uint8_t *out, size_t out_size, size_t *out_len)
 {
 	size_t	 ct_len;
+	int	 rc = -1;
 
 	*out_len = 0;
 	if (enc_len < CIPHER_IV_LEN + CIPHER_BLOCK_LEN)
-		return -1;
+		goto out;
 	ct_len = enc_len - CIPHER_IV_LEN;
 	if (ct_len % CIPHER_BLOCK_LEN != 0)
-		return -1;
-	return aes_cbc(key, enc, 0, enc + CIPHER_IV_LEN, ct_len, out,
+		goto out;
+	rc = aes_cbc(key, enc, 0, enc + CIPHER_IV_LEN, ct_len, out,
 	    out_size, out_len);
+out:
+	if (rc != 0)
+		explicit_bzero(out, out_size);
+	return rc;
 }
 
 int

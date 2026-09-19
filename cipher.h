@@ -79,6 +79,7 @@ int	cipher_hmac_sha256(const uint8_t *, size_t, const uint8_t *, size_t,
 int	cipher_tweak_key(const uint8_t *, const uint8_t *, uint32_t,
 	    uint8_t *);
 
+#ifdef REGRESS
 /*
  * cipher_tweak_pubkey(pub, cke, counter, out, parity):
  *	The request public key Q' of PROTO-TWEAK, from the static
@@ -86,10 +87,12 @@ int	cipher_tweak_key(const uint8_t *, const uint8_t *, uint32_t,
  *	x-only key of CIPHER_XONLY_LEN bytes, and parity takes 0 for
  *	an even Y and 1 for an odd Y. A client needs both answers,
  *	because the ECDH step hashes the compressed point. A failure
- *	writes -1 to parity.
+ *	writes -1 to parity. This answer serves a client, so the
+ *	regress build holds it (ARCH-LAYOUT-5).
  */
 int	cipher_tweak_pubkey(const uint8_t *, const uint8_t *, uint32_t,
 	    uint8_t *, int *);
+#endif
 
 /*
  * cipher_ecdh_keys(priv, pub, label, enc_key, mac_key):
@@ -100,6 +103,17 @@ int	cipher_tweak_pubkey(const uint8_t *, const uint8_t *, uint32_t,
  */
 int	cipher_ecdh_keys(const uint8_t *, const uint8_t *, const char *,
 	    uint8_t *, uint8_t *);
+
+#ifdef REGRESS
+/*
+ * cipher_ecdh_secret(priv, pub, out):
+ *	The ECDH secret of PROTO-ENCRYPT-1, before the split. out
+ *	holds CIPHER_HASH_LEN bytes. The service reads the two
+ *	envelope keys only, so the regress build holds this entry
+ *	point (ARCH-LAYOUT-5).
+ */
+int	cipher_ecdh_secret(const uint8_t *, const uint8_t *, uint8_t *);
+#endif
 
 /*
  * cipher_envelope_open(enc_key, mac_key, env, env_len, out, out_size,
