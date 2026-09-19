@@ -18,9 +18,9 @@
  * The known-answer vectors of the cipher shim (TEST-KAT-1).
  *
  * regress/vectors/generate.py writes this file from libwally. Do not
- * edit it. Every value is a hex string, and a counter is a decimal
- * number. Each request of the transcript holds both sides, so a client
- * implementation reads the same file.
+ * edit it. Every value is a hex string, and a counter or a parity
+ * bit is a decimal number. Each request of the transcript holds both
+ * sides, so a client implementation reads the same file.
  */
 
 #ifndef VECTORS_H
@@ -36,6 +36,8 @@
 #define V_TWEAK_COUNTER	67305985u
 #define V_TWEAK_M	"130a45a618bbb3ca11ae1d396ca46ff6219cf60882b14e78e2792604c7966950"
 #define V_TWEAK_DPRIME	"c1064ee96b58816c117a5d3c99d63ca0aea4b7b4d3cf8d2adec8494df4f0ed70"
+#define V_TWEAK_QPRIME	"f5c1a26cb47166400f20b68c590c52f361b9de1f94340a4440d448ca9017b585"
+#define V_TWEAK_QPRIME_PARITY	0
 #define V_TWEAK_SHARED	"db0ba1c3e46aeb07538deb4dedac5e31b18d483f544866ffe6c6a1a97b460d90"
 #define V_TWEAK_REQUEST_ENC_KEY	"da889ec964e5ff5f5cd3c917c88a68488b5816e51276a1597c5038a3487837e0"
 #define V_TWEAK_REQUEST_MAC_KEY	"34eb8fe1a801c46cc804695b28fc29170c14f9b7e5b10abff1d29d340b313fb5"
@@ -54,6 +56,8 @@
 #define V_SET_COUNTER	1u
 #define V_SET_M	"936338c76bad5f487f12073146ed229ceeff789dc802c02b458828f36a8d7138"
 #define V_SET_DPRIME	"0d650fa40a74d01484550699eb04f18df001e35cf5bc295f7c971ca78afa4cf3"
+#define V_SET_QPRIME	"1443c96c156a42aa198319dc046a1e988119ad2a457c5fa8ad8cafa38d595778"
+#define V_SET_QPRIME_PARITY	0
 #define V_SET_MSGHASH	"5818623b966f0157c8831cf9071d2dbc140f9777b12e9722243827d7467deaee"
 #define V_SET_PAYLOAD	"44f4cf71fbb9157c69082e8ba09cbd4a516a210608000f34bbf933eb7a37af8acb385df015c10cba1f73f5c5caa9c8608c17f45ec2d75939a486f29f850955fc1f1124f3653dc30fd70da4bcd99b3e083f643a81ee5c96f23ca617d17bd80096054ef7c58bf0d51681f2b3cf9ffc8dfc3f484e71670bd11b696d623c2345ed5c08"
 #define V_SET_IV	"3e6b7feaecdf99bdf2380315b84462d9"
@@ -66,6 +70,8 @@
 #define V_GET_COUNTER	2u
 #define V_GET_M	"3458f94d5b6bb41c1b52c6334a39ecad54a9debadc405362c0265a5e5bdd6232"
 #define V_GET_DPRIME	"2c2a2a73098f8eb3407cd6bcd7d905c5cb18ab19fb3120d48d51913c0acd5c1a"
+#define V_GET_QPRIME	"d2593ce20464c0af0a5cd178bf571d320c49f50fb45afc5474b2a58751122a2a"
+#define V_GET_QPRIME_PARITY	1
 #define V_GET_MSGHASH	"d1ce2413e186875302deb54e4267a77fdd73d4a9c7ef436a64d18bb3a0d3e59c"
 #define V_GET_PAYLOAD	"44f4cf71fbb9157c69082e8ba09cbd4a516a210608000f34bbf933eb7a37af8a201c77cc6ce23c040e65c437f90955072c695885535ee7828361b0b8b152c0ca1236f9c7e453c579133c4f760c4adf2e236d177c79502bc7d26d53e4eaeb839fd1"
 #define V_GET_IV	"63282caeb66568cb24c5dbb07c1af406"

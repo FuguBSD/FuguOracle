@@ -103,6 +103,15 @@ t        = secp256k1_tagged_sha256("TapTweak", xonly_P ‖ m)
 d'       = secp256k1_keypair_sec(keypair)
 ```
 
+A client holds the static public key `P` only. It reaches the same point with
+the x-only public tweak:
+
+```
+xonly_P  = secp256k1_xonly_pubkey_from_pubkey(P)
+t        = secp256k1_tagged_sha256("TapTweak", xonly_P ‖ m)
+Q'       = secp256k1_xonly_pubkey_tweak_add(xonly_P, t)
+```
+
 - **PROTO-TWEAK-1** — The service must compute `m` as
   `H(HMAC(key = cke, msg = replay_counter))`.
 - **PROTO-TWEAK-2** — The service must derive `d'` with
@@ -111,6 +120,13 @@ d'       = secp256k1_keypair_sec(keypair)
   is not `m` itself.
 - **PROTO-TWEAK-3** — A known-answer vector generated from `libwally` must pin
   this derivation (see [TEST-KAT](testing.md#test-kat)).
+- **PROTO-TWEAK-4** — `Q'` is the public key of `d'`. The Y parity of `Q'` is
+  part of the key. A client must derive `Q'` from `P` with
+  `secp256k1_xonly_pubkey_tweak_add`, and it must keep that parity. The ECDH
+  step hashes the compressed point
+  ([PROTO-ENCRYPT-1](protocol.md#proto-encrypt)), so a client that drops the
+  parity computes a different shared secret. A known-answer vector must pin the
+  x-only key and the parity bit of `Q'`.
 
 Interop note, verified against the `libwally` source: the upstream server calls
 `wally_ec_private_key_bip341_tweak(d, tweak, 0)` and passes the pin-server

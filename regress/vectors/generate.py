@@ -55,9 +55,9 @@ LICENSE = """\
  * The known-answer vectors of the cipher shim (TEST-KAT-1).
  *
  * regress/vectors/generate.py writes this file from libwally. Do not
- * edit it. Every value is a hex string, and a counter is a decimal
- * number. Each request of the transcript holds both sides, so a client
- * implementation reads the same file.
+ * edit it. Every value is a hex string, and a counter or a parity
+ * bit is a decimal number. Each request of the transcript holds both
+ * sides, so a client implementation reads the same file.
  */"""
 
 REQUEST_LABEL = b"blind_oracle_request"
@@ -98,6 +98,21 @@ def tweak(static_private, cke, counter):
     )
 
 
+def tweak_point(static_private, cke, counter):
+    """The request public key Q' of PROTO-TWEAK-4.
+
+    The answer is the x-only key and the parity bit of its Y
+    coordinate. A client tweaks the static public key P, and the
+    server tweaks the private key d. The two answers name one point,
+    and this function proves it before it writes the vector.
+    """
+    point = wally.ec_public_key_bip341_tweak(
+        public_key(static_private), merkle_root(cke, counter), 0
+    )
+    assert point == public_key(tweak(static_private, cke, counter))
+    return point[1:], bool(point[0] & 1)
+
+
 def split(private, cke, label):
     """The enc_key and the mac_key of PROTO-ENCRYPT-2."""
     keys = wally.hmac_sha512(wally.ecdh(cke, private), label)
@@ -128,6 +143,7 @@ def make_request(static, client, name, counter, pin_secret, entropy):
     cke_private = private_key("FuguOracle KAT %s ephemeral key" % name)
     cke = public_key(cke_private)
     private = tweak(static, cke, counter)
+    point, parity = tweak_point(static, cke, counter)
     message = wally.sha256(cke + le32(counter) + pin_secret + entropy)
     payload = pin_secret + entropy + sign(client, message)
     iv = secret("FuguOracle KAT %s iv" % name)[:16]
@@ -138,6 +154,8 @@ def make_request(static, client, name, counter, pin_secret, entropy):
         "COUNTER": counter,
         "M": merkle_root(cke, counter),
         "DPRIME": private,
+        "QPRIME": point,
+        "QPRIME_PARITY": parity,
         "MSGHASH": message,
         "PAYLOAD": payload,
         "IV": iv,
@@ -149,7 +167,8 @@ def make_request(static, client, name, counter, pin_secret, entropy):
 def rows(prefix, table):
     """The header rows of one request table."""
     order = (
-        "CKE_PRIV CKE COUNTER M DPRIME MSGHASH PAYLOAD IV ENC ENVELOPE"
+        "CKE_PRIV CKE COUNTER M DPRIME QPRIME QPRIME_PARITY "
+        "MSGHASH PAYLOAD IV ENC ENVELOPE"
     ).split()
     return [("V_%s_%s" % (prefix, name), table[name]) for name in order]
 
@@ -164,6 +183,7 @@ def vectors():
     cke = public_key(cke_private)
     counter = 0x04030201
     private = tweak(static, cke, counter)
+    point, parity = tweak_point(static, cke, counter)
     request_enc, request_mac = split(private, cke, REQUEST_LABEL)
     response_enc, response_mac = split(private, cke, RESPONSE_LABEL)
 
@@ -212,6 +232,8 @@ def vectors():
         ("V_TWEAK_COUNTER", counter),
         ("V_TWEAK_M", merkle_root(cke, counter)),
         ("V_TWEAK_DPRIME", private),
+        ("V_TWEAK_QPRIME", point),
+        ("V_TWEAK_QPRIME_PARITY", parity),
         ("V_TWEAK_SHARED", wally.ecdh(cke, private)),
         ("V_TWEAK_REQUEST_ENC_KEY", request_enc),
         ("V_TWEAK_REQUEST_MAC_KEY", request_mac),
@@ -255,6 +277,10 @@ def emit(entries):
     for name, value in entries:
         if value is None:
             lines += ["", "/* %s */" % name]
+        elif isinstance(value, bool):
+            # A parity bit writes as a plain 0 or 1, because a C test
+            # compares it with an int. This test precedes the int test.
+            lines.append("#define %s\t%d" % (name, value))
         elif isinstance(value, int):
             lines.append("#define %s\t%du" % (name, value))
         else:

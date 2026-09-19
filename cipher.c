@@ -61,6 +61,8 @@ static int			 aes_cbc(const uint8_t *, const uint8_t *,
 				    int, const uint8_t *, size_t, uint8_t *,
 				    size_t, size_t *);
 static size_t			 padded(size_t);
+static int			 tweak_scalar(const uint8_t *,
+				    const uint8_t *, uint32_t, uint8_t *);
 
 /*
  * The library context. The shim does not randomize it, because a draw
@@ -203,20 +205,23 @@ cipher_hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *msg,
 	    CIPHER_HASH_LEN);
 }
 
-int
-cipher_tweak_key(const uint8_t *priv, const uint8_t *cke, uint32_t counter,
+/*
+ * The scalar t of one request, for the x-only server key that the
+ * caller serialized (PROTO-TWEAK-2). The private side and the public
+ * side of the tweak add the same scalar, so they share this step.
+ * xonly holds CIPHER_XONLY_LEN bytes, and out takes CIPHER_HASH_LEN
+ * bytes.
+ */
+static int
+tweak_scalar(const uint8_t *xonly, const uint8_t *cke, uint32_t counter,
     uint8_t *out)
 {
 	secp256k1_context	*ctx;
-	secp256k1_keypair	 keypair;
-	secp256k1_xonly_pubkey	 xonly;
 	uint32_t		 le;
 	uint8_t			 mac[CIPHER_HASH_LEN];
-	uint8_t			 tagged[CIPHER_HASH_LEN + CIPHER_HASH_LEN];
-	uint8_t			 tweak[CIPHER_HASH_LEN];
+	uint8_t			 tagged[CIPHER_XONLY_LEN + CIPHER_HASH_LEN];
 	int			 rc = -1;
 
-	memset(&keypair, 0, sizeof(keypair));
 	if ((ctx = context()) == NULL)
 		goto out;
 
@@ -225,7 +230,34 @@ cipher_tweak_key(const uint8_t *priv, const uint8_t *cke, uint32_t counter,
 	if (cipher_hmac_sha256(cke, CIPHER_PUBKEY_LEN, (const uint8_t *)&le,
 	    sizeof(le), mac) != 0)
 		goto out;
-	if (cipher_sha256(mac, sizeof(mac), tagged + CIPHER_HASH_LEN) != 0)
+	memcpy(tagged, xonly, CIPHER_XONLY_LEN);
+	if (cipher_sha256(mac, sizeof(mac), tagged + CIPHER_XONLY_LEN) != 0)
+		goto out;
+	if (secp256k1_tagged_sha256(ctx, out, (const uint8_t *)TAPTWEAK,
+	    sizeof(TAPTWEAK) - 1, tagged, sizeof(tagged)) != 1)
+		goto out;
+	rc = 0;
+out:
+	explicit_bzero(mac, sizeof(mac));
+	explicit_bzero(tagged, sizeof(tagged));
+	if (rc != 0)
+		explicit_bzero(out, CIPHER_HASH_LEN);
+	return rc;
+}
+
+int
+cipher_tweak_key(const uint8_t *priv, const uint8_t *cke, uint32_t counter,
+    uint8_t *out)
+{
+	secp256k1_context	*ctx;
+	secp256k1_keypair	 keypair;
+	secp256k1_xonly_pubkey	 xonly;
+	uint8_t			 serialized[CIPHER_XONLY_LEN];
+	uint8_t			 tweak[CIPHER_HASH_LEN];
+	int			 rc = -1;
+
+	memset(&keypair, 0, sizeof(keypair));
+	if ((ctx = context()) == NULL)
 		goto out;
 
 	/*
@@ -237,10 +269,9 @@ cipher_tweak_key(const uint8_t *priv, const uint8_t *cke, uint32_t counter,
 		goto out;
 	if (secp256k1_keypair_xonly_pub(ctx, &xonly, NULL, &keypair) != 1)
 		goto out;
-	if (secp256k1_xonly_pubkey_serialize(ctx, tagged, &xonly) != 1)
+	if (secp256k1_xonly_pubkey_serialize(ctx, serialized, &xonly) != 1)
 		goto out;
-	if (secp256k1_tagged_sha256(ctx, tweak, (const uint8_t *)TAPTWEAK,
-	    sizeof(TAPTWEAK) - 1, tagged, sizeof(tagged)) != 1)
+	if (tweak_scalar(serialized, cke, counter, tweak) != 0)
 		goto out;
 	if (secp256k1_keypair_xonly_tweak_add(ctx, &keypair, tweak) != 1)
 		goto out;
@@ -249,11 +280,61 @@ cipher_tweak_key(const uint8_t *priv, const uint8_t *cke, uint32_t counter,
 	rc = 0;
 out:
 	explicit_bzero(&keypair, sizeof(keypair));
-	explicit_bzero(mac, sizeof(mac));
-	explicit_bzero(tagged, sizeof(tagged));
+	explicit_bzero(serialized, sizeof(serialized));
 	explicit_bzero(tweak, sizeof(tweak));
 	if (rc != 0)
 		explicit_bzero(out, CIPHER_KEY_LEN);
+	return rc;
+}
+
+int
+cipher_tweak_pubkey(const uint8_t *pub, const uint8_t *cke, uint32_t counter,
+    uint8_t *out, int *parity)
+{
+	secp256k1_context	*ctx;
+	secp256k1_pubkey	 pubkey, tweaked;
+	secp256k1_xonly_pubkey	 xonly;
+	uint8_t			 serialized[CIPHER_XONLY_LEN];
+	uint8_t			 tweak[CIPHER_HASH_LEN];
+	int			 rc = -1;
+
+	*parity = -1;
+	memset(&pubkey, 0, sizeof(pubkey));
+	memset(&tweaked, 0, sizeof(tweaked));
+	if ((ctx = context()) == NULL)
+		goto out;
+
+	/*
+	 * A client holds P, not d, so it adds the scalar to the
+	 * x-only key of P. The answer is d' * G, and its Y parity
+	 * belongs to the answer (PROTO-TWEAK-4).
+	 */
+	if (secp256k1_ec_pubkey_parse(ctx, &pubkey, pub,
+	    CIPHER_PUBKEY_LEN) != 1)
+		goto out;
+	if (secp256k1_xonly_pubkey_from_pubkey(ctx, &xonly, NULL,
+	    &pubkey) != 1)
+		goto out;
+	if (secp256k1_xonly_pubkey_serialize(ctx, serialized, &xonly) != 1)
+		goto out;
+	if (tweak_scalar(serialized, cke, counter, tweak) != 0)
+		goto out;
+	if (secp256k1_xonly_pubkey_tweak_add(ctx, &tweaked, &xonly,
+	    tweak) != 1)
+		goto out;
+	if (secp256k1_xonly_pubkey_from_pubkey(ctx, &xonly, parity,
+	    &tweaked) != 1)
+		goto out;
+	if (secp256k1_xonly_pubkey_serialize(ctx, out, &xonly) != 1)
+		goto out;
+	rc = 0;
+out:
+	explicit_bzero(serialized, sizeof(serialized));
+	explicit_bzero(tweak, sizeof(tweak));
+	if (rc != 0) {
+		explicit_bzero(out, CIPHER_XONLY_LEN);
+		*parity = -1;
+	}
 	return rc;
 }
 

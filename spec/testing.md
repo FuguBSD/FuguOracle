@@ -9,7 +9,7 @@ harness, the fuzzing, the live client test, and the acceptance.
 
 - **TEST-KAT-1** — The `regress/` suite must hold a known-answer vector for
   every cipher shim function, generated once from upstream `libwally`. The
-  functions are the TapTweak derivation, the ECDH shared secret, and the
+  functions are the two TapTweak derivations, the ECDH shared secret, and the
   HMAC-SHA512 KDF split. The other functions are envelope encrypt and decrypt,
   public key recovery, and record encrypt and decrypt.
 - **TEST-KAT-2** — The vectors are committed as hex. `make regress` must need no

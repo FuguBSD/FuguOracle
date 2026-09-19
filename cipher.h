@@ -31,6 +31,7 @@
 
 #define CIPHER_KEY_LEN		32	/* a private key or a derived key */
 #define CIPHER_PUBKEY_LEN	33	/* a public key, SEC1 compressed */
+#define CIPHER_XONLY_LEN	32	/* a public key, x-only */
 #define CIPHER_HASH_LEN		32	/* a SHA-256 or HMAC-SHA256 value */
 #define CIPHER_SIG_LEN		65	/* a recoverable signature */
 #define CIPHER_BLOCK_LEN	16	/* the AES block */
@@ -77,6 +78,18 @@ int	cipher_hmac_sha256(const uint8_t *, size_t, const uint8_t *, size_t,
  */
 int	cipher_tweak_key(const uint8_t *, const uint8_t *, uint32_t,
 	    uint8_t *);
+
+/*
+ * cipher_tweak_pubkey(pub, cke, counter, out, parity):
+ *	The request public key Q' of PROTO-TWEAK, from the static
+ *	public key P. pub holds CIPHER_PUBKEY_LEN bytes, out takes the
+ *	x-only key of CIPHER_XONLY_LEN bytes, and parity takes 0 for
+ *	an even Y and 1 for an odd Y. A client needs both answers,
+ *	because the ECDH step hashes the compressed point. A failure
+ *	writes -1 to parity.
+ */
+int	cipher_tweak_pubkey(const uint8_t *, const uint8_t *, uint32_t,
+	    uint8_t *, int *);
 
 /*
  * cipher_ecdh_keys(priv, pub, label, enc_key, mac_key):

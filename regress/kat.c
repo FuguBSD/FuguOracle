@@ -56,8 +56,11 @@ static void	 dump(const char *, const uint8_t *, size_t);
 static void	 same(const char *, const uint8_t *, size_t,
 		     const struct blob *);
 static void	 ok(const char *, int);
+static void	 parity_is(const char *, int, int);
 static void	 keys(const char *, uint32_t, const char *, uint8_t *,
 		     uint8_t *, uint8_t *);
+static void	 tweaked(const char *, const char *, uint32_t, const char *,
+		     int);
 
 static int	 failures;
 
@@ -115,6 +118,16 @@ ok(const char *name, int cond)
 	failures++;
 }
 
+/* The parity bit of the shim equals the vector. */
+static void
+parity_is(const char *name, int got, int want)
+{
+	if (got == want)
+		return;
+	warnx("%s: the parity is %d, not %d", name, got, want);
+	failures++;
+}
+
 /*
  * The request key d' of one transcript request, and the two envelope
  * keys of one direction. dprime, enc and mac each take a key.
@@ -133,6 +146,28 @@ keys(const char *cke_hex, uint32_t counter, const char *label,
 	    cipher_ecdh_keys(dprime, cke.b, label, enc, mac) == 0);
 }
 
+/*
+ * The request public key Q' of one request, from the static public
+ * key P (PROTO-TWEAK-4). A client holds P only, and it must reach the
+ * x-only key and the parity bit of this vector.
+ */
+static void
+tweaked(const char *name, const char *cke_hex, uint32_t counter,
+    const char *qprime_hex, int qprime_parity)
+{
+	struct blob	 pub, cke, want;
+	uint8_t		 qprime[CIPHER_XONLY_LEN];
+	int		 parity = -1;
+
+	blob(&pub, V_STATIC_PUB);
+	blob(&cke, cke_hex);
+	blob(&want, qprime_hex);
+	ok(name, cipher_tweak_pubkey(pub.b, cke.b, counter, qprime,
+	    &parity) == 0);
+	same(name, qprime, sizeof(qprime), &want);
+	parity_is(name, parity, qprime_parity);
+}
+
 /* The tweak of the static key (PROTO-TWEAK-1, PROTO-TWEAK-2). */
 static void
 t_tweak(void)
@@ -146,6 +181,8 @@ t_tweak(void)
 	ok("tweak", cipher_tweak_key(priv.b, cke.b, V_TWEAK_COUNTER,
 	    dprime) == 0);
 	same("tweak", dprime, sizeof(dprime), &want);
+	tweaked("the tweaked key", V_TWEAK_CKE, V_TWEAK_COUNTER,
+	    V_TWEAK_QPRIME, V_TWEAK_QPRIME_PARITY);
 }
 
 /* The ECDH secret and its split, for both labels (PROTO-ENCRYPT-2). */
@@ -212,11 +249,15 @@ t_open(void)
 	ok("the set_pin payload holds 129 bytes", payload.len == 129);
 	open_request("set_pin open", V_SET_CKE, V_SET_COUNTER, V_SET_DPRIME,
 	    V_SET_ENC, V_SET_PAYLOAD);
+	tweaked("the set_pin tweaked key", V_SET_CKE, V_SET_COUNTER,
+	    V_SET_QPRIME, V_SET_QPRIME_PARITY);
 
 	blob(&payload, V_GET_PAYLOAD);
 	ok("the get_pin payload holds 97 bytes", payload.len == 97);
 	open_request("get_pin open", V_GET_CKE, V_GET_COUNTER, V_GET_DPRIME,
 	    V_GET_ENC, V_GET_PAYLOAD);
+	tweaked("the get_pin tweaked key", V_GET_CKE, V_GET_COUNTER,
+	    V_GET_QPRIME, V_GET_QPRIME_PARITY);
 }
 
 /*
