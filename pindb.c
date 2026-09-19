@@ -215,7 +215,8 @@ out:
  * the plaintext length answers after it (STORE-RECORD-3). A bad
  * record answers PINDB_CORRUPT (OPS-GET-2). A failure of the shim
  * answers PINDB_ERROR, because OPS-GET-2 names no other corrupt
- * record. Each answer but PINDB_OK clears rec.
+ * record. D-10 sends both answers to the junk path. Each answer but
+ * PINDB_OK clears rec.
  */
 static enum pindb_result
 unseal(const struct keys *k, const uint8_t *raw, struct pindb_record *rec)
@@ -241,11 +242,13 @@ unseal(const struct keys *k, const uint8_t *raw, struct pindb_record *rec)
 	}
 	/*
 	 * A failed decryption answers PINDB_ERROR, and the wrong
-	 * plaintext length below answers PINDB_CORRUPT, because
-	 * OPS-GET-2 names the length one a corrupt record and not
-	 * the other. The authenticator covers the enc field, so only
-	 * a holder of pin_auth_key can write bytes that pass it and
-	 * fail to unpad.
+	 * plaintext length below answers PINDB_CORRUPT. OPS-GET-2
+	 * names a wrong plaintext length a corrupt record, and it
+	 * names no corrupt record for a failed decryption. A caller
+	 * takes the junk path for each of the two answers (D-10).
+	 * The authenticator covers the enc field, so only a holder
+	 * of pin_auth_key can write bytes that pass it and fail to
+	 * unpad.
 	 */
 	if (cipher_record_open(k->storage, raw + ENC_OFF, ENC_LEN, plain,
 	    sizeof(plain), &len) != 0)
@@ -333,6 +336,8 @@ pindb_load(const uint8_t *priv, const uint8_t *pubkey,
 	if ((fd = open(path, O_RDONLY)) == -1) {
 		if (errno == ENOENT)
 			res = PINDB_MISSING;
+		else
+			res = PINDB_IO;
 		goto out;
 	}
 
@@ -346,6 +351,7 @@ pindb_load(const uint8_t *priv, const uint8_t *pubkey,
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
+			res = PINDB_IO;
 			goto out;
 		}
 		if (n == 0)
@@ -359,7 +365,7 @@ pindb_load(const uint8_t *priv, const uint8_t *pubkey,
 	res = unseal(&k, raw, out);
 out:
 	if (fd != -1 && close(fd) == -1 && res == PINDB_OK)
-		res = PINDB_ERROR;
+		res = PINDB_IO;
 	explicit_bzero(&k, sizeof(k));
 	explicit_bzero(raw, sizeof(raw));
 	if (res != PINDB_OK)

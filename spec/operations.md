@@ -45,7 +45,10 @@ values. The [risk table](overview.md#ovw-risks) records this accepted property.
   record, a corrupt record, and a replay violation all take the junk path
   ([OPS-JUNK](operations.md#ops-junk)). A corrupt record has a wrong file
   length, a bad `hmac`, a wrong version
-  ([STORE-RECORD-4](storage.md#store-record)), or a wrong plaintext length.
+  ([STORE-RECORD-4](storage.md#store-record)), or a wrong plaintext length. A
+  failure of the shim ([ARCH-LAYOUT-2](architecture.md#arch-layout)) is not a
+  corrupt record. It takes the junk path too, because D-10 sends every `get_pin`
+  failure but an I/O failure there.
 - **OPS-GET-3** — The service must compare `H(pin_secret)` to the stored hash
   with `timingsafe_bcmp(3)`.
 - **OPS-GET-4** — On a correct PIN, the service must persist the record with
@@ -58,7 +61,8 @@ values. The [risk table](overview.md#ovw-risks) records this accepted property.
   must take the junk path.
 - **OPS-GET-7** — The service must persist a record change before it sends the
   response. An I/O failure on load, other than a missing record, and every
-  persist failure are internal failures (`500`). An attempt that the service
+  persist failure are internal failures (`500`). No other `get_pin` failure
+  after payload extraction answers `500` (D-10). An attempt that the service
   cannot count must not receive an answer.
 
 <a id="ops-wipe"></a>
@@ -85,9 +89,11 @@ cryptographically dead: the key share is zero, and the file is gone.
 ## Junk path
 
 The junk path answers `get_pin` failures after payload extraction: no record, a
-corrupt record, a replay violation, and a wrong PIN. An I/O failure returns
-status `500` instead ([OPS-GET-7](operations.md#ops-get)). `set_pin` failures
-return HTTP error statuses (see [OPS-SET-7](operations.md#ops-set) and D-10).
+corrupt record, a replay violation, and a wrong PIN. A failure of the shim takes
+the junk path too. An I/O failure returns status `500` instead
+([OPS-GET-7](operations.md#ops-get)). It is the one `get_pin` failure after
+payload extraction that returns an error status. `set_pin` failures return HTTP
+error statuses (see [OPS-SET-7](operations.md#ops-set) and D-10).
 
 - **OPS-JUNK-1** — The service must respond with status `200` and a valid
   response envelope whose payload is `HMAC(key = random32, msg = pin_secret)`,

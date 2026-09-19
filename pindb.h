@@ -61,15 +61,21 @@ struct pindb_record {
  * the caller decides what each outcome means (OPS-GET-2, OPS-SET-2).
  * PINDB_CORRUPT covers the four corrupt records of OPS-GET-2: a
  * wrong file length, a wrong authenticator, a wrong version, and a
- * wrong plaintext length. PINDB_ERROR covers every other failure,
- * such as an I/O failure on load and a persist failure (OPS-GET-7),
- * and a failure of the shim. OPS-GET names no answer for a failure
- * of the shim today, and it must name one.
+ * wrong plaintext length.
+ *
+ * PINDB_IO and PINDB_ERROR carry the two failure classes of D-10. A
+ * load answers PINDB_IO for an I/O failure, and PINDB_ERROR for
+ * every other failure, such as a failure of the shim. A get_pin
+ * caller answers 500 for PINDB_IO (OPS-GET-7), and it takes the
+ * junk path for PINDB_ERROR (OPS-JUNK). A store and a wipe answer
+ * PINDB_ERROR for each failure, and every one of them is a persist
+ * failure of OPS-GET-7.
  */
 enum pindb_result {
 	PINDB_OK,
 	PINDB_MISSING,
 	PINDB_CORRUPT,
+	PINDB_IO,
 	PINDB_ERROR
 };
 
@@ -99,10 +105,12 @@ void	pindb_unlock(int);
  *	decryption, then the exact plaintext length (STORE-RECORD-1
  *	to STORE-RECORD-4). A wrong length, a wrong authenticator, a
  *	wrong version and a wrong plaintext length each answer
- *	PINDB_CORRUPT. An absent file answers PINDB_MISSING. Every
- *	other failure answers PINDB_ERROR, such as an I/O failure
- *	and a failure of the shim, because OPS-GET-2 names no other
- *	corrupt record. Each answer but PINDB_OK clears out.
+ *	PINDB_CORRUPT, because OPS-GET-2 names no other corrupt
+ *	record. An absent file answers PINDB_MISSING. An I/O failure
+ *	answers PINDB_IO, and every other failure answers
+ *	PINDB_ERROR, such as a failure of the shim. D-10 sends each
+ *	failure but PINDB_IO to the junk path. Each answer but
+ *	PINDB_OK clears out.
  */
 enum pindb_result	pindb_load(const uint8_t *, const uint8_t *,
 			    struct pindb_record *);
@@ -157,9 +165,8 @@ typedef int	(*pindb_hook_fn)(enum pindb_stage, const char *);
 /*
  * pindb_test_hook(fn):
  *	Install the hook of the two stages, or remove it with NULL.
- *	The hook gives a test control inside the call at that stage,
- *	and the test acts there on the file and on the process of
- *	the call (TEST-UNIT, ARCH-LAYOUT-5).
+ *	ARCH-LAYOUT-5 states what a test can do at a stage
+ *	(TEST-UNIT).
  */
 void	pindb_test_hook(pindb_hook_fn);
 #endif

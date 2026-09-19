@@ -812,16 +812,20 @@ t_wipe_close(void)
 }
 
 /*
- * A failed decryption answers an error, and not corrupt, because
- * OPS-GET-2 names no such corrupt record. The case writes a fixed
- * pattern in the enc field, then it writes the authenticator of that
- * pattern with the keys of the client. The bytes therefore pass the
- * authenticator, and the unpad of them fails. In the service, only a
- * holder of pin_auth_key can write such a record, because the
- * authenticator covers the enc field.
+ * A failure of the shim answers PINDB_ERROR, and an I/O failure
+ * answers PINDB_IO. A caller takes the junk path for the first one,
+ * and it answers 500 for the second one (D-10, OPS-GET-7).
+ *
+ * The first case writes a fixed pattern in the enc field, then it
+ * writes the authenticator of that pattern with the keys of the
+ * client. The bytes therefore pass the authenticator, and the unpad
+ * of them fails. In the service, only a holder of pin_auth_key can
+ * write such a record, because the authenticator covers the enc
+ * field. The second case points the record path at itself, so the
+ * open of the load fails with ELOOP.
  */
 static void
-t_internal(void)
+t_failures(void)
 {
 	struct pindb_record	 rec, got;
 	char			 path[PATH_MAX];
@@ -839,9 +843,17 @@ t_internal(void)
 	retag(raw);
 	put(path, raw, PINDB_RECORD_LEN);
 	memset(&got, 0xff, sizeof(got));
-	ok("a failed decryption answers an error",
+	ok("a failed decryption takes the junk path",
 	    pindb_load(priv, pub, &got) == PINDB_ERROR);
-	zeroed("an error clears the answer", &got, sizeof(got));
+	zeroed("that answer clears the record", &got, sizeof(got));
+
+	reset();
+	if (symlink(path, path) == -1)
+		err(1, "%s", path);
+	memset(&got, 0xff, sizeof(got));
+	ok("an I/O failure answers an internal failure",
+	    pindb_load(priv, pub, &got) == PINDB_IO);
+	zeroed("an I/O failure clears the record", &got, sizeof(got));
 }
 
 /*
@@ -1002,7 +1014,7 @@ main(void)
 	t_roundtrip();
 	t_iv();
 	t_corrupt();
-	t_internal();
+	t_failures();
 	t_wipe();
 	t_wipe_close();
 	t_atomic();
