@@ -214,8 +214,8 @@ out:
  * authenticator answers before the decryption (STORE-RECORD-2), and
  * the plaintext length answers after it (STORE-RECORD-3). A bad
  * record answers PINDB_CORRUPT (OPS-GET-2). A failure of the shim
- * answers PINDB_ERROR, because an internal failure must not take the
- * junk path (OPS-GET-7). Each answer but PINDB_OK clears rec.
+ * answers PINDB_ERROR, because OPS-GET-2 names no other corrupt
+ * record. Each answer but PINDB_OK clears rec.
  */
 static enum pindb_result
 unseal(const struct keys *k, const uint8_t *raw, struct pindb_record *rec)
@@ -240,9 +240,12 @@ unseal(const struct keys *k, const uint8_t *raw, struct pindb_record *rec)
 		goto out;
 	}
 	/*
-	 * The authenticator covers the enc field, so these bytes are
-	 * the bytes of a store. A decryption that fails on them is a
-	 * failure of the library, and not a corrupt record.
+	 * A failed decryption answers PINDB_ERROR, and the wrong
+	 * plaintext length below answers PINDB_CORRUPT, because
+	 * OPS-GET-2 names the length one a corrupt record and not
+	 * the other. The authenticator covers the enc field, so only
+	 * a holder of pin_auth_key can write bytes that pass it and
+	 * fail to unpad.
 	 */
 	if (cipher_record_open(k->storage, raw + ENC_OFF, ENC_LEN, plain,
 	    sizeof(plain), &len) != 0)

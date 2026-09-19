@@ -59,10 +59,12 @@ struct pindb_record {
 /*
  * The answer of one record call. The store names the outcome, and
  * the caller decides what each outcome means (OPS-GET-2, OPS-SET-2).
- * PINDB_CORRUPT covers a wrong file length, a wrong authenticator, a
- * wrong version, and a wrong plaintext length. PINDB_ERROR covers
- * every other failure, such as an I/O failure and a failure of the
- * shim (OPS-GET-7).
+ * PINDB_CORRUPT covers the four corrupt records of OPS-GET-2: a
+ * wrong file length, a wrong authenticator, a wrong version, and a
+ * wrong plaintext length. PINDB_ERROR covers every other failure,
+ * such as an I/O failure on load and a persist failure (OPS-GET-7),
+ * and a failure of the shim. OPS-GET names no answer for a failure
+ * of the shim today, and it must name one.
  */
 enum pindb_result {
 	PINDB_OK,
@@ -98,9 +100,9 @@ void	pindb_unlock(int);
  *	to STORE-RECORD-4). A wrong length, a wrong authenticator, a
  *	wrong version and a wrong plaintext length each answer
  *	PINDB_CORRUPT. An absent file answers PINDB_MISSING. Every
- *	other failure answers PINDB_ERROR, because the caller must
- *	not answer an internal failure with a junk key (OPS-GET-7).
- *	Each answer but PINDB_OK clears out.
+ *	other failure answers PINDB_ERROR, such as an I/O failure
+ *	and a failure of the shim, because OPS-GET-2 names no other
+ *	corrupt record. Each answer but PINDB_OK clears out.
  */
 enum pindb_result	pindb_load(const uint8_t *, const uint8_t *,
 			    struct pindb_record *);
@@ -155,8 +157,9 @@ typedef int	(*pindb_hook_fn)(enum pindb_stage, const char *);
 /*
  * pindb_test_hook(fn):
  *	Install the hook of the two stages, or remove it with NULL.
- *	A test stops a write before the rename(2) (TEST-UNIT-2), and
- *	a test reads the record before the unlink(2) (TEST-UNIT-1).
+ *	The hook gives a test control inside the call at that stage,
+ *	and the test acts there on the file and on the process of
+ *	the call (TEST-UNIT, ARCH-LAYOUT-5).
  */
 void	pindb_test_hook(pindb_hook_fn);
 #endif

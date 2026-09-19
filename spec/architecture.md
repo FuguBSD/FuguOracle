@@ -113,8 +113,9 @@ fuguoracle/
   that the tests alone reach. `#ifdef REGRESS` must guard each such entry point.
   A shim entry point can compute a client answer, because a known-answer vector
   must pin both sides of a request (see
-  [PROTO-TWEAK-4](protocol.md#proto-tweak)). A record store entry point can
-  reach one step of a store or of a wipe. A test reads the record file at that
-  step, or it stops the call there (see [TEST-UNIT](testing.md#test-unit)). The
-  service program must not carry test code, and it must not carry code that only
-  a client needs.
+  [PROTO-TWEAK-4](protocol.md#proto-tweak)). A record store entry point can give
+  a test control at one step of a store or of a wipe (see
+  [TEST-UNIT](testing.md#test-unit)). The test acts there on the state of that
+  step, and it then continues the call or stops it. The entry point must hold no
+  test logic of its own. The service program must not carry test code, and it
+  must not carry code that only a client needs.

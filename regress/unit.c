@@ -26,8 +26,10 @@
  *
  * The program writes the fixed random source first, and it names it
  * in FUGUORACLE_RANDOM (SEC-RANDOM-2). The unit tests pin no draw, so
- * the source holds the hash chain of one committed seed. A failing
- * run therefore repeats.
+ * the source holds the hash chain of one committed seed. Two runs
+ * therefore read the same bytes through the seam. The lock test still
+ * depends on the scheduler and on its timeouts, and mkstemp(3) draws
+ * outside the seam.
  *
  * The program prints nothing when every test passes.
  */
@@ -73,6 +75,10 @@
 /* The bytes of the fixed random source of the run. */
 #define SOURCE_LEN	4096
 
+/* The chain writes whole hash blocks, so the source holds no tail. */
+_Static_assert(SOURCE_LEN % CIPHER_HASH_LEN == 0,
+    "the source length must be a multiple of the hash");
+
 /* The seed of that source. The chain of it fills SOURCE_LEN bytes. */
 #define SOURCE_SEED	"fuguoracle unit tests"
 
@@ -82,7 +88,7 @@
 /* The count that the first request of the lock test stores. */
 #define LOCK_COUNT	2
 
-/* The milliseconds that the lock test waits for one marker. */
+/* The milliseconds that the lock test waits for a marker or an exit. */
 #define LOCK_TIMEOUT	10000
 
 /* The milliseconds between two tests of the exit of a child. */
@@ -806,13 +812,13 @@ t_wipe_close(void)
 }
 
 /*
- * A failure of the shim answers an error, and not corrupt
- * (OPS-GET-7). The case writes a fixed pattern in the enc field,
- * then it writes the authenticator of that pattern with the keys of
- * the client. The bytes therefore pass the authenticator, and the
- * decryption of them fails. In the service, only a failure inside
- * the library reaches this path, because no other writer holds the
- * authentication key.
+ * A failed decryption answers an error, and not corrupt, because
+ * OPS-GET-2 names no such corrupt record. The case writes a fixed
+ * pattern in the enc field, then it writes the authenticator of that
+ * pattern with the keys of the client. The bytes therefore pass the
+ * authenticator, and the unpad of them fails. In the service, only a
+ * holder of pin_auth_key can write such a record, because the
+ * authenticator covers the enc field.
  */
 static void
 t_internal(void)
@@ -952,7 +958,8 @@ t_lock(void)
  * The fixed random source of the run. The seam of the regress build
  * reads it in draw order, and the unit tests pin no draw. The source
  * holds the hash chain of SOURCE_SEED, so two runs read the same
- * bytes and a failing run repeats (SEC-RANDOM-2).
+ * bytes through the seam (SEC-RANDOM-2). A draw outside the seam,
+ * such as the one of mkstemp(3), stays random.
  */
 static void
 random_source(char *path, size_t size)
@@ -973,8 +980,6 @@ random_source(char *path, size_t size)
 		if (cipher_sha256(block, sizeof(block), block) != 0)
 			errx(1, "the chain of the source");
 	}
-	if (i != sizeof(buf))
-		errx(1, "the source length is no multiple of the hash");
 	if ((fd = mkstemp(path)) == -1)
 		err(1, "mkstemp");
 	if (write(fd, buf, sizeof(buf)) != (ssize_t)sizeof(buf))

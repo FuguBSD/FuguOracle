@@ -20,8 +20,9 @@
 # The regress build defines REGRESS, so each draw of the seam comes
 # from the file that FUGUORACLE_RANDOM names (SEC-RANDOM-2). The
 # context blinding of SEC-RANDOM-3 draws outside the seam. The
-# regress build also holds the record store hook of TEST-UNIT-1 and
-# TEST-UNIT-2 (ARCH-LAYOUT-5).
+# regress build also holds the record store hook, which gives a
+# test control at one step of a store and of a wipe
+# (ARCH-LAYOUT-5).
 #
 # The unit tests write records, so this build names a record
 # directory of the regress tree. The path stays a compile-time
