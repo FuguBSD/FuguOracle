@@ -20,11 +20,10 @@
  * ARCH-LAYOUT-2).
  *
  * Every function but cipher_random() returns 0, or -1 on a failure.
- * A failure writes no plaintext and no key to an output buffer. The
- * two open functions differ in one point: cipher_record_open()
- * clears the whole caller buffer on each failure, and
- * cipher_envelope_open() leaves the buffer untouched until the tag
- * answers. Each contract below states the rule of its function.
+ * A failure leaves no plaintext and no key of the call in an output
+ * buffer. The four envelope and record functions can also clear the
+ * caller buffer of a failed call, and the contract of each one below
+ * states when.
  */
 
 #ifndef CIPHER_H
@@ -55,8 +54,10 @@
 /*
  * cipher_random(buf, len):
  *	Fill buf with len random bytes (SEC-RANDOM-1). Each draw of
- *	the program comes through this one seam, except the context
- *	blinding of SEC-RANDOM-3 (SEC-RANDOM-2).
+ *	the program comes through this one seam. Two draws stay
+ *	outside it: the context blinding of SEC-RANDOM-3, and the
+ *	file names that mkstemp(3) draws for a record write
+ *	(SEC-RANDOM-2, STORE-ATOMIC-3).
  */
 void	cipher_random(void *, size_t);
 
@@ -155,7 +156,11 @@ int	cipher_envelope_open(const uint8_t *, const uint8_t *,
  *	The envelope of a plaintext, with a fresh IV from the seam
  *	(PROTO-ENCRYPT-4). out_size counts at least pt_len rounded up
  *	to the next CIPHER_BLOCK_LEN plus CIPHER_ENVELOPE_OVERHEAD
- *	bytes. out_len takes the envelope length.
+ *	bytes. out_len takes the envelope length. A pt_len above
+ *	INT_MAX and a small out_size each leave out untouched. Each
+ *	later failure clears out_size bytes, because the IV of the
+ *	call is already in the buffer. A caller that reuses a buffer
+ *	can therefore lose the earlier contents of it.
  */
 int	cipher_envelope_seal(const uint8_t *, const uint8_t *,
 	    const uint8_t *, size_t, uint8_t *, size_t, size_t *);
@@ -187,7 +192,11 @@ int	cipher_record_open(const uint8_t *, const uint8_t *, size_t,
  *	The enc field of a record, with a fresh IV from the seam
  *	(STORE-RECORD-5). out_size counts at least pt_len rounded up
  *	to the next CIPHER_BLOCK_LEN plus CIPHER_IV_LEN bytes, and
- *	out_len takes the field length.
+ *	out_len takes the field length. A pt_len above INT_MAX and a
+ *	small out_size each leave out untouched. Each later failure
+ *	clears out_size bytes, because the IV of the call is already
+ *	in the buffer. A caller that reuses a buffer can therefore
+ *	lose the earlier contents of it.
  */
 int	cipher_record_seal(const uint8_t *, const uint8_t *, size_t,
 	    uint8_t *, size_t, size_t *);

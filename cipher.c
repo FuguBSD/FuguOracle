@@ -280,7 +280,7 @@ tweak_scalar(const uint8_t *xonly, const uint8_t *cke, uint32_t counter,
 	if ((ctx = context()) == NULL)
 		goto out;
 
-	/* The tagged hash covers the x-only key and m (PROTO-TWEAK-1). */
+	/* The tagged hash covers the x-only key and m (PROTO-TWEAK-2). */
 	memcpy(tagged, xonly, CIPHER_XONLY_LEN);
 	if (tweak_input(cke, counter, tagged + CIPHER_XONLY_LEN) != 0)
 		goto out;

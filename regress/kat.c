@@ -58,6 +58,7 @@ static void	 same(const char *, const uint8_t *, size_t,
 static void	 ok(const char *, int);
 static void	 parity_is(const char *, int, int);
 static void	 zeroed(const char *, const uint8_t *, size_t);
+static void	 untouched(const char *, const uint8_t *, size_t, uint8_t);
 static void	 m_is(const char *, const char *, uint32_t, const char *);
 static void	 keys(const char *, uint32_t, const char *, uint8_t *,
 		     uint8_t *, uint8_t *);
@@ -139,6 +140,20 @@ zeroed(const char *name, const uint8_t *buf, size_t len)
 	for (i = 0; i < len; i++)
 		if (buf[i] != 0) {
 			warnx("%s: the buffer holds byte %zu", name, i);
+			failures++;
+			return;
+		}
+}
+
+/* A call left the fill byte of a buffer in place. */
+static void
+untouched(const char *name, const uint8_t *buf, size_t len, uint8_t fill)
+{
+	size_t	 i;
+
+	for (i = 0; i < len; i++)
+		if (buf[i] != fill) {
+			warnx("%s: the buffer lost byte %zu", name, i);
 			failures++;
 			return;
 		}
@@ -304,8 +319,10 @@ t_open(void)
 }
 
 /*
- * A changed envelope answers -1, and the open of a wrong tag writes
- * no plaintext, because the tag check runs first (PROTO-ENCRYPT-3).
+ * A changed envelope answers -1. A wrong tag and a wrong length each
+ * leave the buffer of the caller in place, because the open answers
+ * before the decryption (PROTO-ENCRYPT-3). A bad padding fails after
+ * the decryption, so that failure clears the buffer.
  */
 static void
 t_reject(void)
@@ -314,8 +331,7 @@ t_reject(void)
 	uint8_t		 dprime[CIPHER_KEY_LEN];
 	uint8_t		 enc[CIPHER_KEY_LEN], mac[CIPHER_KEY_LEN];
 	uint8_t		 out[BLOB_MAX];
-	size_t		 i, len;
-	int		 kept = 1;
+	size_t		 len;
 
 	keys(V_GET_CKE, V_GET_COUNTER, CIPHER_LABEL_REQUEST, dprime, enc,
 	    mac);
@@ -326,21 +342,30 @@ t_reject(void)
 	ok("a wrong tag", cipher_envelope_open(enc, mac, env.b, env.len, out,
 	    sizeof(out), &len) == -1);
 	ok("a wrong tag writes no length", len == 0);
-	for (i = 0; i < sizeof(out); i++)
-		if (out[i] != 0xa5)
-			kept = 0;
-	ok("a wrong tag writes no plaintext", kept);
+	untouched("a wrong tag", out, sizeof(out), 0xa5);
 
 	blob(&env, V_GET_ENC);
 	env.b[CIPHER_IV_LEN] ^= 0x01;
 	ok("a changed ciphertext", cipher_envelope_open(enc, mac, env.b,
 	    env.len, out, sizeof(out), &len) == -1);
 
+	/*
+	 * A wrong length answers before the tag step, so it leaves
+	 * the buffer of the caller in place. Each case fills the
+	 * buffer first, so the test reads a byte of its own.
+	 */
 	blob(&env, V_GET_ENC);
+	memset(out, 0xa5, sizeof(out));
 	ok("a short envelope", cipher_envelope_open(enc, mac, env.b,
 	    CIPHER_ENVELOPE_OVERHEAD, out, sizeof(out), &len) == -1);
+	ok("a short envelope writes no length", len == 0);
+	untouched("a short envelope", out, sizeof(out), 0xa5);
+
+	memset(out, 0xa5, sizeof(out));
 	ok("a ciphertext beside the block", cipher_envelope_open(enc, mac,
 	    env.b, env.len - 1, out, sizeof(out), &len) == -1);
+	ok("a ciphertext beside the block writes no length", len == 0);
+	untouched("a ciphertext beside the block", out, sizeof(out), 0xa5);
 
 	/*
 	 * A tag that answers, and a padding that does not. The change
