@@ -81,7 +81,7 @@ one use (D-13).
 - **OVW-VOCABULARY-3** — A test reads the banned words from this document and
   scans every tracked file for them. The scan skips a code span, a code block,
   and a file that a pack of FuguBSD/Tooling owns. It also skips a record under
-  `docs/research/` and the rule that names the words.
+  `docs/research/`, a file under `ports/`, and the rule that names the words.
 
 <a id="ovw-risks"></a>
 

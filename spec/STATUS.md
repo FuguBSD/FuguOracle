@@ -20,49 +20,49 @@ phase applies.
 
 ## Units
 
-| Unit                                            | State | Done by | Note                                                                                  |
-| ----------------------------------------------- | ----- | ------- | ------------------------------------------------------------------------------------- |
-| [OVW-PURPOSE](overview.md#ovw-purpose)          | open  | P3      | —                                                                                     |
-| [OVW-SCOPE](overview.md#ovw-scope)              | n-a   | —       | Citation only.                                                                        |
-| [OVW-VOCABULARY](overview.md#ovw-vocabulary)    | done  | —       | [vocabulary.t](../t/fuguoracle/vocabulary.t) reads the five words and scans the tree. |
-| [OVW-RISKS](overview.md#ovw-risks)              | n-a   | —       | Citation only.                                                                        |
-| [ARCH-STACK](architecture.md#arch-stack)        | open  | P3      | —                                                                                     |
-| [ARCH-DEPS](architecture.md#arch-deps)          | open  | P1      | —                                                                                     |
-| [ARCH-LAYOUT](architecture.md#arch-layout)      | open  | P3      | —                                                                                     |
-| [PROTO-HTTP](protocol.md#proto-http)            | open  | P3      | —                                                                                     |
-| [PROTO-ENVELOPE](protocol.md#proto-envelope)    | open  | P2      | —                                                                                     |
-| [PROTO-TWEAK](protocol.md#proto-tweak)          | open  | P1      | —                                                                                     |
-| [PROTO-ENCRYPT](protocol.md#proto-encrypt)      | open  | P1      | —                                                                                     |
-| [PROTO-PAYLOAD](protocol.md#proto-payload)      | open  | P2      | —                                                                                     |
-| [PROTO-RESPONSE](protocol.md#proto-response)    | open  | P2      | —                                                                                     |
-| [STORE-KEYS](storage.md#store-keys)             | open  | P2      | —                                                                                     |
-| [STORE-RECORD](storage.md#store-record)         | open  | P2      | —                                                                                     |
-| [STORE-ATOMIC](storage.md#store-atomic)         | open  | P2      | —                                                                                     |
-| [OPS-SET](operations.md#ops-set)                | open  | P2      | —                                                                                     |
-| [OPS-GET](operations.md#ops-get)                | open  | P2      | —                                                                                     |
-| [OPS-WIPE](operations.md#ops-wipe)              | open  | P2      | —                                                                                     |
-| [OPS-JUNK](operations.md#ops-junk)              | open  | P2      | —                                                                                     |
-| [DEPLOY-HTTPD](deployment.md#deploy-httpd)      | open  | P3      | —                                                                                     |
-| [DEPLOY-SERVICE](deployment.md#deploy-service)  | open  | P3      | —                                                                                     |
-| [DEPLOY-BACKUP](deployment.md#deploy-backup)    | open  | P4      | —                                                                                     |
-| [CLIENT-MODEL](clients.md#client-model)         | n-a   | —       | Citation only.                                                                        |
-| [CLIENT-PROVISION](clients.md#client-provision) | open  | P4      | —                                                                                     |
-| [CLIENT-JADE](clients.md#client-jade)           | open  | P4      | —                                                                                     |
-| [PKG-SECP](packaging.md#pkg-secp)               | open  | P4      | —                                                                                     |
-| [PKG-ORACLE](packaging.md#pkg-oracle)           | open  | P4      | —                                                                                     |
-| [PROG-CGI](programs.md#prog-cgi)                | open  | P3      | —                                                                                     |
-| [PROG-KEYGEN](programs.md#prog-keygen)          | open  | P3      | —                                                                                     |
-| [SEC-THREAT](security.md#sec-threat)            | n-a   | —       | Citation only.                                                                        |
-| [SEC-SANDBOX](security.md#sec-sandbox)          | open  | P3      | —                                                                                     |
-| [SEC-MEMORY](security.md#sec-memory)            | open  | P3      | —                                                                                     |
-| [SEC-RANDOM](security.md#sec-random)            | open  | P3      | —                                                                                     |
-| [SEC-LOGGING](security.md#sec-logging)          | open  | P3      | —                                                                                     |
-| [TEST-KAT](testing.md#test-kat)                 | open  | P1      | —                                                                                     |
-| [TEST-UNIT](testing.md#test-unit)               | open  | P2      | —                                                                                     |
-| [TEST-INTEROP](testing.md#test-interop)         | open  | P3      | —                                                                                     |
-| [TEST-FUZZ](testing.md#test-fuzz)               | open  | P3      | —                                                                                     |
-| [TEST-LIVE](testing.md#test-live)               | open  | P4      | —                                                                                     |
-| [TEST-ACCEPT](testing.md#test-accept)           | open  | P3      | —                                                                                     |
+| Unit                                            | State | Done by | Note                                                                                                   |
+| ----------------------------------------------- | ----- | ------- | ------------------------------------------------------------------------------------------------------ |
+| [OVW-PURPOSE](overview.md#ovw-purpose)          | open  | P3      | —                                                                                                      |
+| [OVW-SCOPE](overview.md#ovw-scope)              | n-a   | —       | Citation only.                                                                                         |
+| [OVW-VOCABULARY](overview.md#ovw-vocabulary)    | done  | —       | [vocabulary.t](../t/fuguoracle/vocabulary.t) reads the five words and scans the tree outside `ports/`. |
+| [OVW-RISKS](overview.md#ovw-risks)              | n-a   | —       | Citation only.                                                                                         |
+| [ARCH-STACK](architecture.md#arch-stack)        | open  | P3      | —                                                                                                      |
+| [ARCH-DEPS](architecture.md#arch-deps)          | open  | P1      | —                                                                                                      |
+| [ARCH-LAYOUT](architecture.md#arch-layout)      | open  | P3      | —                                                                                                      |
+| [PROTO-HTTP](protocol.md#proto-http)            | open  | P3      | —                                                                                                      |
+| [PROTO-ENVELOPE](protocol.md#proto-envelope)    | open  | P2      | —                                                                                                      |
+| [PROTO-TWEAK](protocol.md#proto-tweak)          | open  | P1      | —                                                                                                      |
+| [PROTO-ENCRYPT](protocol.md#proto-encrypt)      | open  | P1      | —                                                                                                      |
+| [PROTO-PAYLOAD](protocol.md#proto-payload)      | open  | P2      | —                                                                                                      |
+| [PROTO-RESPONSE](protocol.md#proto-response)    | open  | P2      | —                                                                                                      |
+| [STORE-KEYS](storage.md#store-keys)             | open  | P2      | —                                                                                                      |
+| [STORE-RECORD](storage.md#store-record)         | open  | P2      | —                                                                                                      |
+| [STORE-ATOMIC](storage.md#store-atomic)         | open  | P2      | —                                                                                                      |
+| [OPS-SET](operations.md#ops-set)                | open  | P2      | —                                                                                                      |
+| [OPS-GET](operations.md#ops-get)                | open  | P2      | —                                                                                                      |
+| [OPS-WIPE](operations.md#ops-wipe)              | open  | P2      | —                                                                                                      |
+| [OPS-JUNK](operations.md#ops-junk)              | open  | P2      | —                                                                                                      |
+| [DEPLOY-HTTPD](deployment.md#deploy-httpd)      | open  | P3      | —                                                                                                      |
+| [DEPLOY-SERVICE](deployment.md#deploy-service)  | open  | P3      | —                                                                                                      |
+| [DEPLOY-BACKUP](deployment.md#deploy-backup)    | open  | P4      | —                                                                                                      |
+| [CLIENT-MODEL](clients.md#client-model)         | n-a   | —       | Citation only.                                                                                         |
+| [CLIENT-PROVISION](clients.md#client-provision) | open  | P4      | —                                                                                                      |
+| [CLIENT-JADE](clients.md#client-jade)           | open  | P4      | —                                                                                                      |
+| [PKG-SECP](packaging.md#pkg-secp)               | open  | P4      | —                                                                                                      |
+| [PKG-ORACLE](packaging.md#pkg-oracle)           | open  | P4      | —                                                                                                      |
+| [PROG-CGI](programs.md#prog-cgi)                | open  | P3      | —                                                                                                      |
+| [PROG-KEYGEN](programs.md#prog-keygen)          | open  | P3      | —                                                                                                      |
+| [SEC-THREAT](security.md#sec-threat)            | n-a   | —       | Citation only.                                                                                         |
+| [SEC-SANDBOX](security.md#sec-sandbox)          | open  | P3      | —                                                                                                      |
+| [SEC-MEMORY](security.md#sec-memory)            | open  | P3      | —                                                                                                      |
+| [SEC-RANDOM](security.md#sec-random)            | open  | P3      | —                                                                                                      |
+| [SEC-LOGGING](security.md#sec-logging)          | open  | P3      | —                                                                                                      |
+| [TEST-KAT](testing.md#test-kat)                 | open  | P1      | —                                                                                                      |
+| [TEST-UNIT](testing.md#test-unit)               | open  | P2      | —                                                                                                      |
+| [TEST-INTEROP](testing.md#test-interop)         | open  | P3      | —                                                                                                      |
+| [TEST-FUZZ](testing.md#test-fuzz)               | open  | P3      | —                                                                                                      |
+| [TEST-LIVE](testing.md#test-live)               | open  | P4      | —                                                                                                      |
+| [TEST-ACCEPT](testing.md#test-accept)           | open  | P3      | —                                                                                                      |
 
 ## Update protocol
 

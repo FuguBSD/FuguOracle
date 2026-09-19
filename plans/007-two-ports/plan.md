@@ -3,12 +3,10 @@
 ## Status
 
 Proposed. It waits on plan 004 for the programs and on plan 005 for the
-deployment files. It also waits on a decision, stated under Open questions
-below: the vocabulary rule forbids a word that the `libsecp256k1` port must
-name.
+deployment files.
 
 Implements: PKG-SECP, PKG-ORACLE, DEPLOY-BACKUP, CLIENT-PROVISION, CLIENT-JADE,
-TEST-LIVE. Defers: OVW-VOCABULARY.
+TEST-LIVE.
 
 ## Purpose
 
@@ -82,17 +80,6 @@ PKG-ORACLE-7). A port never depends on `fuguvm`.
 - Every cited unit reads `done`. TEST-LIVE reads `done` after the operator
   records the pass.
 - The change deletes this plan.
-
-## Open questions
-
-The library port must name the upstream GitHub account in `GH_ACCOUNT`, and the
-first half of that name is a banned word (D-13, OVW-VOCABULARY-2). The
-vocabulary test exempts a code span, a code block, `docs/research/`, and a
-synced file, and a port Makefile is none of these. Two ways out exist, and each
-needs human approval first. The first amends D-13 and OVW-VOCABULARY-3 of this
-repository to exempt `ports/`. The same decision reaches each sibling repository
-through its own plan. The second fetches the distfile from an address of the
-organization, and that breaks the convention of the ports tree for a submission.
 
 ## What this plan does not do
 

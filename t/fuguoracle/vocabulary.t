@@ -67,7 +67,14 @@ sub _synced ($path)
 my @hits;
 for my $path (`git ls-files --cached --others --exclude-standard`) {
 	chomp $path;
-	next if $path eq $self || $path =~ m{^docs/research/} || _synced($path);
+
+	# A port names its upstream, and the ports tree fixes that
+	# name, so a file under ports/ is outside the rule.
+	next
+	    if $path eq $self
+	    || $path =~ m{^docs/research/}
+	    || $path =~ m{^ports/}
+	    || _synced($path);
 	my $text = _slurp($path) // next;
 
 	# A fenced code block and an inline code span hold names, not
