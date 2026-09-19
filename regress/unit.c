@@ -26,7 +26,8 @@
  *
  * The program writes the fixed random source first, and it names it
  * in FUGUORACLE_RANDOM (SEC-RANDOM-2). The unit tests pin no draw, so
- * the source holds random bytes.
+ * the source holds the hash chain of one committed seed. A failing
+ * run therefore repeats.
  *
  * The program prints nothing when every test passes.
  */
@@ -42,6 +43,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +73,9 @@
 /* The bytes of the fixed random source of the run. */
 #define SOURCE_LEN	4096
 
+/* The seed of that source. The chain of it fills SOURCE_LEN bytes. */
+#define SOURCE_SEED	"fuguoracle unit tests"
+
 /* The seconds that the first request of the lock test holds the lock. */
 #define LOCK_WAIT	1
 
@@ -79,6 +84,12 @@
 
 /* The milliseconds that the lock test waits for one marker. */
 #define LOCK_TIMEOUT	10000
+
+/* The milliseconds between two tests of the exit of a child. */
+#define LOCK_POLL	10
+
+/* The descriptors that the close hook of the wipe inspects. */
+#define HOOK_FD_MAX	64
 
 static uint8_t	 priv[CIPHER_KEY_LEN];		/* the static key d */
 static uint8_t	 pub[CIPHER_PUBKEY_LEN];	/* the client public key */
@@ -90,6 +101,7 @@ static char	 hook_path[PATH_MAX];
 static uint8_t	 hook_file[PINDB_RECORD_LEN + 1];
 static size_t	 hook_len;
 static ino_t	 hook_ino;
+static int	 hook_fd = -1;
 
 static void	 ok(const char *, int);
 static void	 ok2(const char *, const char *, int);
@@ -109,7 +121,9 @@ static void	 put(const char *, const uint8_t *, size_t);
 static void	 retag(uint8_t *);
 static int	 read_hook(enum pindb_stage, const char *);
 static int	 stop_hook(enum pindb_stage, const char *);
+static int	 close_hook(enum pindb_stage, const char *);
 static int	 marker(int);
+static int	 reap(pid_t, int *);
 static void	 child_first(int);
 static void	 child_second(int);
 static void	 random_source(char *, size_t);
@@ -419,6 +433,40 @@ stop_hook(enum pindb_stage which, const char *path)
 	return -1;
 }
 
+/*
+ * The hook of the wipe of t_wipe_close: it closes the descriptor that
+ * the call holds. The wipe opens the record for a write, and this
+ * program opens no second one, so the access mode and the inode name
+ * that descriptor.
+ */
+static int
+close_hook(enum pindb_stage which, const char *path)
+{
+	struct stat	 st, open_st;
+	int		 fd, flags;
+
+	hook_calls++;
+	ok("the wipe reaches the unlink stage", which == PINDB_STAGE_UNLINK);
+	if (stat(path, &st) == -1)
+		err(1, "%s", path);
+	for (fd = 0; fd < HOOK_FD_MAX; fd++) {
+		if ((flags = fcntl(fd, F_GETFL)) == -1)
+			continue;
+		if ((flags & O_ACCMODE) != O_WRONLY)
+			continue;
+		if (fstat(fd, &open_st) == -1)
+			continue;
+		if (open_st.st_ino != st.st_ino ||
+		    open_st.st_dev != st.st_dev)
+			continue;
+		if (close(fd) == -1)
+			err(1, "close");
+		hook_fd = fd;
+		break;
+	}
+	return 0;
+}
+
 /* One marker of the order pipe, or -1 after the timeout. */
 static int
 marker(int fd)
@@ -434,6 +482,31 @@ marker(int fd)
 	if (read(fd, &c, 1) != 1)
 		return -1;
 	return (unsigned char)c;
+}
+
+/*
+ * The status of one child, or -1 after LOCK_TIMEOUT. A lock that no
+ * request releases must not hold the regress run for ever, so the
+ * wait ends with SIGKILL.
+ */
+static int
+reap(pid_t pid, int *status)
+{
+	int	 ms;
+	pid_t	 got;
+
+	for (ms = 0; ms < LOCK_TIMEOUT; ms += LOCK_POLL) {
+		if ((got = waitpid(pid, status, WNOHANG)) == -1)
+			err(1, "waitpid");
+		if (got == pid)
+			return 0;
+		usleep(LOCK_POLL * 1000);
+	}
+	if (kill(pid, SIGKILL) == -1)
+		err(1, "kill");
+	if (waitpid(pid, status, 0) == -1)
+		err(1, "waitpid");
+	return -1;
 }
 
 /*
@@ -704,6 +777,68 @@ t_wipe(void)
 }
 
 /*
+ * A close(2) failure after the unlink(2) keeps the answer of a
+ * completed wipe (OPS-WIPE-2). The fsync(2) carries the write, so
+ * the close(2) reports nothing about it.
+ */
+static void
+t_wipe_close(void)
+{
+	struct pindb_record	 rec;
+	char			 path[PATH_MAX];
+
+	reset();
+	fixture(&rec, 2, 13);
+	record_file(path, sizeof(path));
+	ok("the store before the second wipe",
+	    pindb_store(priv, pub, &rec) == PINDB_OK);
+
+	hook_calls = 0;
+	hook_fd = -1;
+	pindb_test_hook(close_hook);
+	ok("a wipe with a closed descriptor answers ok",
+	    pindb_wipe(priv, pub, &rec) == PINDB_OK);
+	pindb_test_hook(NULL);
+	ok("the hook runs once", hook_calls == 1);
+	ok("the hook closes the descriptor of the wipe", hook_fd != -1);
+	ok("the wipe removes the file",
+	    access(path, F_OK) == -1 && errno == ENOENT);
+}
+
+/*
+ * A failure of the shim answers an error, and not corrupt
+ * (OPS-GET-7). The case writes a fixed pattern in the enc field,
+ * then it writes the authenticator of that pattern with the keys of
+ * the client. The bytes therefore pass the authenticator, and the
+ * decryption of them fails. In the service, only a failure inside
+ * the library reaches this path, because no other writer holds the
+ * authentication key.
+ */
+static void
+t_internal(void)
+{
+	struct pindb_record	 rec, got;
+	char			 path[PATH_MAX];
+	uint8_t			 raw[PINDB_RECORD_LEN + 1];
+
+	reset();
+	fixture(&rec, 1, 4);
+	record_file(path, sizeof(path));
+	ok("the store before the forged record",
+	    pindb_store(priv, pub, &rec) == PINDB_OK);
+	ok("that record holds 129 bytes",
+	    slurp(path, raw, sizeof(raw)) == PINDB_RECORD_LEN);
+
+	memset(raw + R_ENC, 0x5a, R_ENC_LEN);
+	retag(raw);
+	put(path, raw, PINDB_RECORD_LEN);
+	memset(&got, 0xff, sizeof(got));
+	ok("a failed decryption answers an error",
+	    pindb_load(priv, pub, &got) == PINDB_ERROR);
+	zeroed("an error clears the answer", &got, sizeof(got));
+}
+
+/*
  * A store that stops before the rename leaves the target record and
  * leaves no second file (TEST-UNIT-2, STORE-ATOMIC-3).
  */
@@ -800,14 +935,12 @@ t_lock(void)
 	if (close(fds[0]) == -1)
 		err(1, "pipe");
 
-	if (waitpid(a, &status, 0) == -1)
-		err(1, "waitpid");
 	ok("the first request ends well",
-	    WIFEXITED(status) && WEXITSTATUS(status) == 0);
-	if (waitpid(b, &status, 0) == -1)
-		err(1, "waitpid");
+	    reap(a, &status) == 0 && WIFEXITED(status) &&
+	    WEXITSTATUS(status) == 0);
 	ok("the second request ends well",
-	    WIFEXITED(status) && WEXITSTATUS(status) == 0);
+	    reap(b, &status) == 0 && WIFEXITED(status) &&
+	    WEXITSTATUS(status) == 0);
 
 	ok("the lock serializes the two requests",
 	    strcmp(order, "ASB") == 0);
@@ -817,19 +950,31 @@ t_lock(void)
 
 /*
  * The fixed random source of the run. The seam of the regress build
- * reads it in draw order, and the unit tests pin no draw, so the
- * source holds random bytes (SEC-RANDOM-2).
+ * reads it in draw order, and the unit tests pin no draw. The source
+ * holds the hash chain of SOURCE_SEED, so two runs read the same
+ * bytes and a failing run repeats (SEC-RANDOM-2).
  */
 static void
 random_source(char *path, size_t size)
 {
 	uint8_t	 buf[SOURCE_LEN];
+	uint8_t	 block[CIPHER_HASH_LEN];
+	size_t	 i;
 	int	 n, fd;
 
 	n = snprintf(path, size, "unit.random.XXXXXXXXXX");
 	if (n < 0 || (size_t)n >= size)
 		errx(1, "the source path is too long");
-	arc4random_buf(buf, sizeof(buf));
+	if (cipher_sha256((const uint8_t *)SOURCE_SEED,
+	    sizeof(SOURCE_SEED) - 1, block) != 0)
+		errx(1, "the seed of the source");
+	for (i = 0; i + sizeof(block) <= sizeof(buf); i += sizeof(block)) {
+		memcpy(buf + i, block, sizeof(block));
+		if (cipher_sha256(block, sizeof(block), block) != 0)
+			errx(1, "the chain of the source");
+	}
+	if (i != sizeof(buf))
+		errx(1, "the source length is no multiple of the hash");
 	if ((fd = mkstemp(path)) == -1)
 		err(1, "mkstemp");
 	if (write(fd, buf, sizeof(buf)) != (ssize_t)sizeof(buf))
@@ -852,7 +997,9 @@ main(void)
 	t_roundtrip();
 	t_iv();
 	t_corrupt();
+	t_internal();
 	t_wipe();
+	t_wipe_close();
 	t_atomic();
 	t_lock();
 

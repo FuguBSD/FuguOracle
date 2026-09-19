@@ -44,7 +44,8 @@ values. The [risk table](overview.md#ovw-risks) records this accepted property.
   the client counter must be strictly greater than the stored counter. A missing
   record, a corrupt record, and a replay violation all take the junk path
   ([OPS-JUNK](operations.md#ops-junk)). A corrupt record has a wrong file
-  length, a bad `hmac`, or a wrong plaintext length.
+  length, a bad `hmac`, a wrong version
+  ([STORE-RECORD-4](storage.md#store-record)), or a wrong plaintext length.
 - **OPS-GET-3** — The service must compare `H(pin_secret)` to the stored hash
   with `timingsafe_bcmp(3)`.
 - **OPS-GET-4** — On a correct PIN, the service must persist the record with

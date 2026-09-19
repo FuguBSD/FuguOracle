@@ -212,8 +212,10 @@ out:
 /*
  * The record of PINDB_RECORD_LEN bytes that raw holds. The
  * authenticator answers before the decryption (STORE-RECORD-2), and
- * the plaintext length answers after it (STORE-RECORD-3). Each
- * failure answers PINDB_CORRUPT and clears rec.
+ * the plaintext length answers after it (STORE-RECORD-3). A bad
+ * record answers PINDB_CORRUPT (OPS-GET-2). A failure of the shim
+ * answers PINDB_ERROR, because an internal failure must not take the
+ * junk path (OPS-GET-7). Each answer but PINDB_OK clears rec.
  */
 static enum pindb_result
 unseal(const struct keys *k, const uint8_t *raw, struct pindb_record *rec)
@@ -222,22 +224,33 @@ unseal(const struct keys *k, const uint8_t *raw, struct pindb_record *rec)
 	uint8_t			 tag[CIPHER_TAG_LEN];
 	uint8_t			 plain[PLAIN_MAX];
 	size_t			 len;
-	enum pindb_result	 res = PINDB_CORRUPT;
+	enum pindb_result	 res = PINDB_ERROR;
 
 	msg[0] = raw[0];
 	memcpy(msg + 1, raw + ENC_OFF, ENC_LEN);
 	if (cipher_hmac_sha256(k->auth, CIPHER_KEY_LEN, msg, sizeof(msg),
 	    tag) != 0)
 		goto out;
-	if (timingsafe_bcmp(tag, raw + 1, CIPHER_TAG_LEN) != 0)
+	if (timingsafe_bcmp(tag, raw + 1, CIPHER_TAG_LEN) != 0) {
+		res = PINDB_CORRUPT;
 		goto out;
-	if (raw[0] != PINDB_VERSION)	/* STORE-RECORD-4 */
+	}
+	if (raw[0] != PINDB_VERSION) {	/* STORE-RECORD-4 */
+		res = PINDB_CORRUPT;
 		goto out;
+	}
+	/*
+	 * The authenticator covers the enc field, so these bytes are
+	 * the bytes of a store. A decryption that fails on them is a
+	 * failure of the library, and not a corrupt record.
+	 */
 	if (cipher_record_open(k->storage, raw + ENC_OFF, ENC_LEN, plain,
 	    sizeof(plain), &len) != 0)
 		goto out;
-	if (len != PINDB_PLAIN_LEN)
+	if (len != PINDB_PLAIN_LEN) {
+		res = PINDB_CORRUPT;
 		goto out;
+	}
 	unpack(plain, rec);
 	res = PINDB_OK;
 out:
@@ -456,8 +469,13 @@ pindb_wipe(const uint8_t *priv, const uint8_t *pubkey,
 		goto out;
 	res = PINDB_OK;
 out:
-	if (fd != -1 && close(fd) == -1)
-		res = PINDB_ERROR;
+	/*
+	 * A close(2) failure does not change the answer. On the path
+	 * to PINDB_OK, the fsync(2) carried the write and the
+	 * unlink(2) removed the file.
+	 */
+	if (fd != -1)
+		close(fd);
 	explicit_bzero(&k, sizeof(k));
 	explicit_bzero(&dead, sizeof(dead));
 	explicit_bzero(raw, sizeof(raw));

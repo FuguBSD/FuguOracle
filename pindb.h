@@ -60,7 +60,9 @@ struct pindb_record {
  * The answer of one record call. The store names the outcome, and
  * the caller decides what each outcome means (OPS-GET-2, OPS-SET-2).
  * PINDB_CORRUPT covers a wrong file length, a wrong authenticator, a
- * wrong version, and a wrong plaintext length.
+ * wrong version, and a wrong plaintext length. PINDB_ERROR covers
+ * every other failure, such as an I/O failure and a failure of the
+ * shim (OPS-GET-7).
  */
 enum pindb_result {
 	PINDB_OK,
@@ -93,10 +95,12 @@ void	pindb_unlock(int);
  *	The read path checks the exact file length, then the
  *	authenticator in constant time, then the version, then the
  *	decryption, then the exact plaintext length (STORE-RECORD-1
- *	to STORE-RECORD-4). A failure of any of those steps answers
- *	PINDB_CORRUPT. An absent file answers PINDB_MISSING, and an
- *	I/O failure answers PINDB_ERROR. Each answer but PINDB_OK
- *	clears out.
+ *	to STORE-RECORD-4). A wrong length, a wrong authenticator, a
+ *	wrong version and a wrong plaintext length each answer
+ *	PINDB_CORRUPT. An absent file answers PINDB_MISSING. Every
+ *	other failure answers PINDB_ERROR, because the caller must
+ *	not answer an internal failure with a junk key (OPS-GET-7).
+ *	Each answer but PINDB_OK clears out.
  */
 enum pindb_result	pindb_load(const uint8_t *, const uint8_t *,
 			    struct pindb_record *);
@@ -107,8 +111,11 @@ enum pindb_result	pindb_load(const uint8_t *, const uint8_t *,
  *	mkstemp(3) in PINS_DIR, the write, fsync(2), rename(2) over
  *	the target, then fsync(2) of the directory (STORE-ATOMIC-3).
  *	Each write draws a fresh IV (STORE-RECORD-5). A failure
- *	answers PINDB_ERROR, and it leaves the target and the
- *	directory as they were.
+ *	answers PINDB_ERROR. A failure before the rename(2) leaves
+ *	the target and the directory as they were. A failure of the
+ *	directory fsync(2) leaves the new record in the target, and
+ *	the answer stays PINDB_ERROR, because a crash can still lose
+ *	that record (STORE-ATOMIC-3, OPS-GET-7).
  */
 enum pindb_result	pindb_store(const uint8_t *, const uint8_t *,
 			    const struct pindb_record *);
@@ -121,7 +128,8 @@ enum pindb_result	pindb_store(const uint8_t *, const uint8_t *,
  *	(OPS-WIPE-1). It overwrites the file in place, it calls
  *	fsync(2), then it calls unlink(2) (OPS-WIPE-2). An absent
  *	file answers PINDB_MISSING, and a failure answers
- *	PINDB_ERROR.
+ *	PINDB_ERROR. A successful unlink(2) answers PINDB_OK, because
+ *	the fsync(2) already carried the write.
  */
 enum pindb_result	pindb_wipe(const uint8_t *, const uint8_t *,
 			    const struct pindb_record *);
