@@ -16,24 +16,30 @@
 # The build of the source. OpenBSD make reads this file, and GNU make
 # reads GNUmakefile for the document gates.
 #
-# The tree holds the shim alone, so the default target compiles it.
-# Plan 004 adds main.c, http.c and keygen.c, and this file then links
-# the two programs. They link static, because the service runs inside
-# the /var/www chroot (ARCH-STACK-3, ARCH-DEPS-4).
+# The tree holds the shim and the record store, so the default target
+# compiles them. Plan 004 adds main.c, http.c and keygen.c, and this
+# file then links the two programs. They link static, because the
+# service runs inside the /var/www chroot (ARCH-STACK-3,
+# ARCH-DEPS-4).
 #
-# `make -C regress regress` builds the known-answer tests. It links
-# the archive of the port and the archive of the base system today.
+# This build defines no REGRESS and no PINS_DIR, so it holds no test
+# hook and it names the record directory of PROG-CGI-4.
+#
+# `make -C regress regress` builds the known-answer tests and the
+# unit tests. It links the archive of the port and the archive of the
+# base system today.
 
 LOCALBASE?=	/usr/local
 
 CFLAGS+=	-Wall -Wextra -Werror
 CFLAGS+=	-I${LOCALBASE}/include
 
-OBJS=		cipher.o
+OBJS=		cipher.o pindb.o
 
 all: ${OBJS}
 
 cipher.o: cipher.c cipher.h
+pindb.o: pindb.c pindb.h cipher.h
 
 clean:
 	rm -f ${OBJS}

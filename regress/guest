@@ -37,7 +37,7 @@ FUGUVM=${FUGUVM:-fuguvm}
 WORK=/home/fuguoracle
 
 # The source that the guest builds. A new source file joins this list.
-SOURCE="Makefile cipher.c cipher.h regress"
+SOURCE="Makefile cipher.c cipher.h pindb.c pindb.h regress"
 
 # The autotools that build the library. The release tarball holds no
 # configure script, and the base system holds no autotools.
@@ -74,8 +74,8 @@ $FUGUVM ssh -- sh -c "set -e; pkg_add -I $PACKAGES; cd $WORK; \
 	mkdir library; tar xzf library.tar.gz -C library; cd library/*; \
 	$VERSIONS ./autogen.sh; ./configure $CONFIGURE; make; make install"
 
-echo "guest: the shim"
-$FUGUVM ssh -- sh -c "cd $WORK/src; make cipher.o"
+echo "guest: the service objects"
+$FUGUVM ssh -- sh -c "cd $WORK/src; make"
 
-echo "guest: the known-answer tests"
+echo "guest: the known-answer tests and the unit tests"
 $FUGUVM ssh -- sh -c "cd $WORK/src/regress; make regress"
