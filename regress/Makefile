@@ -13,8 +13,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# The regression tests. `make regress` builds kat and unit, and it
-# runs each of them. The vectors are committed as hex, so the run
+# The regression tests. `make regress` builds kat, unit and ops, and
+# it runs each of them. The vectors are committed as hex, so the run
 # needs no Python and no network (TEST-KAT-2).
 #
 # The regress build defines REGRESS, so each draw of the seam comes
@@ -24,14 +24,15 @@
 # test control at one step of a store and of a wipe
 # (ARCH-LAYOUT-5).
 #
-# The unit tests write records, so this build names a record
-# directory of the regress tree. The path stays a compile-time
-# constant (D-06), and unit.c empties that directory before each
-# case.
+# The unit tests and the tests of the operations write records, so
+# this build names a record directory of the regress tree. The path
+# stays a compile-time constant (D-06), and each program empties that
+# directory before a case.
 
-PROGS=		kat unit
+PROGS=		kat unit ops
 SRCS_kat=	kat.c cipher.c
 SRCS_unit=	unit.c pindb.c cipher.c
+SRCS_ops=	ops.c oracle.c pindb.c cipher.c
 
 .PATH:		${.CURDIR}/..
 
@@ -43,6 +44,6 @@ CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/.. -I${LOCALBASE}/include
 LDFLAGS+=	-static -L${LOCALBASE}/lib
 LDADD=		-lsecp256k1 -lcrypto
 DPADD=		${LOCALBASE}/lib/libsecp256k1.a ${LIBCRYPTO}
-CLEANFILES+=	pins/* unit.random.*
+CLEANFILES+=	pins/* unit.random.* ops.random.*
 
 .include <bsd.regress.mk>
