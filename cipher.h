@@ -165,6 +165,22 @@ int	cipher_envelope_open(const uint8_t *, const uint8_t *,
 int	cipher_envelope_seal(const uint8_t *, const uint8_t *,
 	    const uint8_t *, size_t, uint8_t *, size_t, size_t *);
 
+#ifdef REGRESS
+/*
+ * cipher_sign_recoverable(priv, msghash, out):
+ *	The recoverable signature of a message hash, in the libwally
+ *	form of PROTO-PAYLOAD-2. priv holds the private key of the
+ *	signer, of CIPHER_KEY_LEN bytes, msghash holds
+ *	CIPHER_HASH_LEN bytes, and out takes CIPHER_SIG_LEN bytes.
+ *	The header byte holds 27 + 4 + recid, the form that the two
+ *	signatures of the transcript of vectors.h hold. A client
+ *	signs each payload, and the service recovers the key of a
+ *	signature only, so the regress build holds this entry point
+ *	(ARCH-LAYOUT-5).
+ */
+int	cipher_sign_recoverable(const uint8_t *, const uint8_t *, uint8_t *);
+#endif
+
 /*
  * cipher_recover_pubkey(msghash, sig, out):
  *	The public key of the signer of a message hash
