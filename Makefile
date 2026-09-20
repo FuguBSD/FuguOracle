@@ -16,31 +16,31 @@
 # The build of the source. OpenBSD make reads this file, and GNU make
 # reads GNUmakefile for the document gates.
 #
-# The tree holds the shim, the record store and the state machine, so
-# the default target compiles them. The programs of PROG-CGI and
-# PROG-KEYGEN add main.c, http.c and keygen.c, and this file then
-# links them. They link static, because the service runs inside the
-# /var/www chroot (ARCH-STACK-3, ARCH-DEPS-4).
+# The default target builds fuguoracle, the program of PROG-CGI. It
+# links the archive of the port and the archive of the base system,
+# because the service runs inside the /var/www chroot (ARCH-STACK-3,
+# ARCH-DEPS-4). The program of PROG-KEYGEN adds keygen.c to the list
+# below, and this file then links it as well.
 #
-# This build defines no REGRESS and no PINS_DIR, so it holds no test
-# hook and it names the record directory of PROG-CGI-4.
+# MAN is empty, because this directory holds no manual page today.
+#
+# This build defines no REGRESS, no PINS_DIR and no KEY_PATH, so it
+# holds no test hook, and it names the two paths of PROG-CGI-4.
 #
 # `make -C regress regress` builds the known-answer tests, the unit
 # tests and the tests of the operations. It links the archive of the
-# port and the archive of the base system today.
+# port and the archive of the base system as well.
+
+PROGS=			fuguoracle
+SRCS_fuguoracle=	main.c http.c cipher.c oracle.c pindb.c
+MAN=
 
 LOCALBASE?=	/usr/local
 
 CFLAGS+=	-Wall -Wextra -Werror
 CFLAGS+=	-I${LOCALBASE}/include
+LDFLAGS+=	-static -L${LOCALBASE}/lib
+LDADD=		-lsecp256k1 -lcrypto
+DPADD=		${LOCALBASE}/lib/libsecp256k1.a ${LIBCRYPTO}
 
-OBJS=		cipher.o oracle.o pindb.o
-
-all: ${OBJS}
-
-cipher.o: cipher.c cipher.h
-oracle.o: oracle.c oracle.h pindb.h cipher.h
-pindb.o: pindb.c pindb.h cipher.h
-
-clean:
-	rm -f ${OBJS}
+.include <bsd.prog.mk>
