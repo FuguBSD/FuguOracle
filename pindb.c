@@ -507,7 +507,8 @@ out:
 	 */
 	if (fd != -1)
 		close(fd);
-	if (res != PINDB_OK)
+	/* An absent record answers PINDB_MISSING, and it is no failure. */
+	if (res == PINDB_ERROR)
 		syslog(LOG_ERR, "the wipe of a record failed");
 	explicit_bzero(&k, sizeof(k));
 	explicit_bzero(&dead, sizeof(dead));

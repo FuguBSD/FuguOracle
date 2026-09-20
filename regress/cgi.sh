@@ -319,9 +319,9 @@ class_is "a short envelope" reject 400
 # scanner steps over the value of each unknown member, and it reads
 # the extent of a nested object, a nested array and a nested string.
 # Each body below carries the get_pin envelope of the transcript, and
-# the store holds no record, so a body that the scanner reads answers
-# the junk path with an envelope of 96 bytes. A body that it rejects
-# answers 400 with an empty body.
+# the store holds no record. The scanner reads each of the two bodies,
+# so each one answers the junk path with 200 and an envelope of 96
+# bytes.
 reset
 value=$(b64 "$get_env")
 printf '{"a": {"b": [1, "}"], "c": null}, "data": "%s", "d": [{}]}' \
