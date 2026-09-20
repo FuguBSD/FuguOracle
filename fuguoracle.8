@@ -220,8 +220,12 @@ cap, and a short envelope each take this class.
 The request failed inside the oracle, or an I/O call failed.
 .El
 .Pp
-A third-strike wipe logs one line at LOG_WARNING, and each I/O failure
-logs one line at LOG_ERR.
+A third-strike wipe logs one line at LOG_WARNING.
+Each I/O failure logs one line at LOG_ERR.
+A failed read of the request body, a failed read of the key file and
+a failed write of the answer log such a line.
+The record store logs such a line for a failed read, a failed store,
+a failed wipe and a failed lock.
 No line holds key material, a payload, or a record name.
 .Sh SEE ALSO
 .Xr pledge 2 ,

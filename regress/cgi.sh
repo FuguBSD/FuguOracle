@@ -29,12 +29,14 @@
 # key file and the record directory alone, so that file sits in the
 # record directory.
 #
-# Each case reads the log line of its request from /var/log/daemon.
-# The program logs at LOG_DAEMON and LOG_INFO, and the syslog.conf
-# of the base system sends daemon.info to that file (SEC-LOGGING-1).
-# The outcome class of that line is the one answer that separates a
-# junk path from a real one, because OPS-JUNK-2 makes the status,
-# the headers and the envelope size identical.
+# Each case reads the log lines of its request from /var/log/daemon.
+# The program logs at LOG_DAEMON, and the syslog.conf of the base
+# system sends daemon.info and each higher level to that file
+# (SEC-LOGGING-1). The outcome class of the LOG_INFO line is the one
+# answer that separates a junk path from a real one, because
+# OPS-JUNK-2 makes the status, the headers and the envelope size
+# identical. The wipe line of LOG_WARNING and the failure line of
+# LOG_ERR land in the same file (OPS-WIPE-3, SEC-LOGGING-2).
 #
 # The script needs no package. perl and openssl of the base system
 # convert the hex of vectors.h, and they build one record.
@@ -149,31 +151,29 @@ envelope_bytes() {
 	'
 }
 
-# log_new():
-#	The bytes that the log took after the last request.
-#	syslogd(8) writes the line of one request after the exit of
-#	the program, so this call waits for it.
-log_new() {
+# log_holds(name, text):
+#	One test of the log of the last request. The log takes one
+#	line that ends with text. syslogd(8) writes each line after
+#	the exit of the program, so this call waits for it. The
+#	bytes of the log stay in $work/log.
+log_holds() {
 	_try=0
 	while [ "$_try" -lt 5 ]; do
 		tail -c "+$((log_off + 1))" "$log" > "$work/log"
-		if grep -q 'fuguoracle\[' "$work/log"; then
+		if grep -q "fuguoracle\[[0-9]*\]: $2\$" "$work/log"; then
 			return
 		fi
 		sleep 1
 		_try=$((_try + 1))
 	done
+	fail "$1: the log holds no line \"$2\""
 }
 
 # class_is(name, class, status):
 #	The log line of the last request holds one outcome class and
 #	the status of the answer (SEC-LOGGING-2).
 class_is() {
-	log_new
-	if grep -q "fuguoracle\[[0-9]*\]: $2 $3\$" "$work/log"; then
-		return
-	fi
-	fail "$1: the log line holds no \"$2 $3\""
+	log_holds "$1" "$2 $3"
 }
 
 # reset():
@@ -208,13 +208,14 @@ tweak_envelope() {
 	' "$tweak_cke" "$_le" "$_iv" "$tweak_mac_key" "$work/ct"
 }
 
-# wrong_pin_record(path):
+# wrong_pin_record(path, count):
 #	The record of the client of the transcript, with the hash of
-#	another PIN. No request can carry a wrong PIN for an existing
-#	record, because the signature of the payload covers the
-#	pin_secret (PROTO-PAYLOAD-3). The script writes the record
-#	instead, from the two record keys of the client
-#	(STORE-KEYS-1, STORE-RECORD).
+#	another PIN and the count of the bad attempts. No request can
+#	carry a wrong PIN for an existing record, because the
+#	signature of the payload covers the pin_secret
+#	(PROTO-PAYLOAD-3). The script writes the record instead, from
+#	the two record keys of the client (STORE-KEYS-1,
+#	STORE-RECORD).
 wrong_pin_record() {
 	_iv=0f0e0d0c0b0a09080706050403020100
 	_keys=$(perl -MDigest::SHA=sha256,hmac_sha256 -e '
@@ -225,8 +226,9 @@ wrong_pin_record() {
 	' "$static_priv" "$client_pub")
 
 	# The plaintext of PINDB_PLAIN_LEN bytes: a hash that no PIN
-	# answers, a zero key share, no count, and no counter.
-	perl -e 'print "\0" x 69' > "$work/plain"
+	# answers, a zero key share, the count, and no counter.
+	perl -e 'print "\0" x 64, chr($ARGV[0]), "\0" x 4' "$2" \
+	    > "$work/plain"
 	openssl enc -aes-256-cbc -K "${_keys% *}" -iv "$_iv" \
 	    -in "$work/plain" -out "$work/ct"
 	perl -MDigest::SHA=hmac_sha256 -e '
@@ -313,6 +315,26 @@ post /set_pin 00112233445566778899aabbccddeeff
 check "a short envelope" 400 "$(status)"
 class_is "a short envelope" reject 400
 
+# An unknown member and insignificant whitespace (PROTO-HTTP-7). The
+# scanner steps over the value of each unknown member, and it reads
+# the extent of a nested object, a nested array and a nested string.
+# Each body below carries the get_pin envelope of the transcript, and
+# the store holds no record, so a body that the scanner reads answers
+# the junk path with an envelope of 96 bytes. A body that it rejects
+# answers 400 with an empty body.
+reset
+value=$(b64 "$get_env")
+printf '{"a": {"b": [1, "}"], "c": null}, "data": "%s", "d": [{}]}' \
+    "$value" > "$work/body"
+send POST /get_pin "$work/body" "$(bytes "$work/body")"
+check "an unknown member" 200 "$(status)"
+check "an unknown member answers an envelope" 96 "$(envelope_bytes)"
+
+printf ' {\n\t"data"\r\n\t: "%s"\n} ' "$value" > "$work/body"
+send POST /get_pin "$work/body" "$(bytes "$work/body")"
+check "insignificant whitespace" 200 "$(status)"
+check "whitespace answers an envelope" 96 "$(envelope_bytes)"
+
 # A payload of another length is an internal failure, and no client
 # error (PROTO-PAYLOAD-5, OPS-SET-7).
 reset
@@ -372,7 +394,7 @@ head_of "$work/junk2"
 reset
 post /set_pin "$set_env"
 record=$(ls "$pins"/*.pin)
-wrong_pin_record "$record"
+wrong_pin_record "$record" 0
 cp "$record" "$work/before"
 post /get_pin "$get_env"
 check "a wrong PIN" 200 "$(status)"
@@ -392,9 +414,21 @@ cmp -s "$work/junk1" "$work/junk3" ||
 cmp -s "$work/junk1" "$work/real" ||
     fail "a junk path and the real answer hold two header sets"
 
-# An I/O failure of the load is an internal failure (OPS-GET-7). A
-# directory at the record path answers each open call, and no read
-# call of it.
+# The third strike destroys the key share, and it writes one line at
+# LOG_WARNING (OPS-GET-6, OPS-WIPE-3). The record below carries two
+# bad attempts, so the wrong PIN of the request is the third one.
+reset
+post /set_pin "$set_env"
+record=$(ls "$pins"/*.pin)
+wrong_pin_record "$record" 2
+post /get_pin "$get_env"
+check "a third strike" 200 "$(status)"
+class_is "a third strike" junk 200
+log_holds "a third strike" "a third strike destroyed a key share"
+
+# An I/O failure of the load is an internal failure (OPS-GET-7), and
+# it writes one line at LOG_ERR (SEC-LOGGING-2). A directory at the
+# record path answers each open call, and no read call of it.
 reset
 post /set_pin "$set_env"
 record=$(ls "$pins"/*.pin)
@@ -403,6 +437,7 @@ mkdir "$record"
 post /get_pin "$get_env"
 check "an I/O failure on load" 500 "$(status)"
 class_is "an I/O failure on load" error 500
+log_holds "an I/O failure on load" "the read of a record failed"
 rmdir "$record"
 
 # Each program links static (ARCH-DEPS-4, ARCH-STACK-3). ldd(1)

@@ -26,6 +26,12 @@
  * third strike like every other junk path, so the CGI entry cannot
  * see a wipe (OPS-WIPE-3).
  *
+ * A failed call writes one line at LOG_ERR, at the one exit path of
+ * that call (SEC-LOGGING-2). A load writes that line for an I/O
+ * failure alone, because a missing record and a corrupt record are
+ * answers of the store. No line names a record, a key or a payload
+ * (SEC-LOGGING-3).
+ *
  * Each key and each plaintext lives in a stack buffer, and each exit
  * path clears it under one goto out (SEC-MEMORY-1, SEC-MEMORY-2).
  * The authenticator comparison runs in constant time (SEC-MEMORY-3).
@@ -310,7 +316,12 @@ sync_dir(void)
 int
 pindb_lock(void)
 {
-	return open(PINS_DIR "/.lock", O_RDWR | O_CREAT | O_EXLOCK, 0600);
+	int	 fd;
+
+	fd = open(PINS_DIR "/.lock", O_RDWR | O_CREAT | O_EXLOCK, 0600);
+	if (fd == -1)
+		syslog(LOG_ERR, "the lock of the record store failed");
+	return fd;
 }
 
 void
@@ -371,6 +382,8 @@ pindb_load(const uint8_t *priv, const uint8_t *pubkey,
 out:
 	if (fd != -1 && close(fd) == -1 && res == PINDB_OK)
 		res = PINDB_IO;
+	if (res == PINDB_IO)
+		syslog(LOG_ERR, "the read of a record failed");
 	explicit_bzero(&k, sizeof(k));
 	explicit_bzero(raw, sizeof(raw));
 	if (res != PINDB_OK)
@@ -431,6 +444,8 @@ out:
 		close(fd);
 	if (tmp[0] != '\0')
 		unlink(tmp);
+	if (res != PINDB_OK)
+		syslog(LOG_ERR, "the store of a record failed");
 	explicit_bzero(&k, sizeof(k));
 	explicit_bzero(raw, sizeof(raw));
 	return res;
@@ -492,6 +507,8 @@ out:
 	 */
 	if (fd != -1)
 		close(fd);
+	if (res != PINDB_OK)
+		syslog(LOG_ERR, "the wipe of a record failed");
 	explicit_bzero(&k, sizeof(k));
 	explicit_bzero(&dead, sizeof(dead));
 	explicit_bzero(raw, sizeof(raw));

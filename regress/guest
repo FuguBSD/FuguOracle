@@ -14,8 +14,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# guest: build the library and the tests in the OpenBSD guest, and run
-# them there (ARCH-DEPS-5).
+# guest: build the library, the two programs and the tests in the
+# OpenBSD guest, and run each test there (ARCH-DEPS-5).
 #
 # usage: guest <libsecp256k1 tarball>
 #
@@ -36,8 +36,12 @@ FUGUVM=${FUGUVM:-fuguvm}
 # partition of the guest holds a few megabytes only.
 WORK=/home/fuguoracle
 
-# The source that the guest builds. A new source file joins this list.
-SOURCE="Makefile cipher.c cipher.h oracle.c oracle.h pindb.c pindb.h regress"
+# The source that the guest builds. A new source file joins this
+# list. The Makefile names the two manual pages, so they travel with
+# the source as well.
+SOURCE="Makefile cipher.c cipher.h http.c http.h keygen.c main.c \
+	oracle.c oracle.h pindb.c pindb.h fuguoracle.8 fuguoracle-keygen.8 \
+	regress"
 
 # The autotools that build the library. The release tarball holds no
 # configure script, and the base system holds no autotools.
@@ -74,8 +78,8 @@ $FUGUVM ssh -- sh -c "set -e; pkg_add -I $PACKAGES; cd $WORK; \
 	mkdir library; tar xzf library.tar.gz -C library; cd library/*; \
 	$VERSIONS ./autogen.sh; ./configure $CONFIGURE; make; make install"
 
-echo "guest: the service objects"
+echo "guest: the two programs"
 $FUGUVM ssh -- sh -c "cd $WORK/src; make"
 
-echo "guest: the known-answer tests, the unit tests and the operations"
+echo "guest: the regression tests"
 $FUGUVM ssh -- sh -c "cd $WORK/src/regress; make regress"
