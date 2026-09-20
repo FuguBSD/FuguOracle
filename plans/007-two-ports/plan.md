@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed. It waits on plan 004 for the programs and on plan 005 for the
-deployment files.
+Proposed. The tree holds the two programs, and this plan waits on plan 005 for
+the deployment files.
 
 Implements: PKG-SECP, PKG-ORACLE, DEPLOY-BACKUP, CLIENT-PROVISION, CLIENT-JADE,
 TEST-LIVE.
