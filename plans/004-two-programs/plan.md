@@ -7,17 +7,21 @@ transcript pair. Plan 005 waits on it.
 
 Implements: OVW-PURPOSE, PROTO-HTTP, PROTO-ENVELOPE, PROTO-PAYLOAD,
 PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-LOGGING. Implements: SEC-SANDBOX
-without SEC-SANDBOX-4. Implements: ARCH-DEPS, ARCH-LAYOUT, SEC-MEMORY, OPS-SET,
-OPS-GET, OPS-JUNK, OPS-WIPE. Defers: DEPLOY-HTTPD, DEPLOY-SERVICE.
+without SEC-SANDBOX-4. Implements: ARCH-STACK without ARCH-STACK-1,
+ARCH-STACK-2, ARCH-STACK-4 and ARCH-STACK-5. Implements: ARCH-DEPS, ARCH-LAYOUT,
+SEC-MEMORY, OPS-SET, OPS-GET, OPS-JUNK, OPS-WIPE. Defers: DEPLOY-HTTPD,
+DEPLOY-SERVICE.
 
 This plan lands the absent part of each `partial` unit that it cites. PROTO-HTTP
 lands the error status of PROTO-ENVELOPE-2, PROTO-PAYLOAD-5, OPS-SET-7 and
 OPS-GET-7, and the status and the headers of OPS-JUNK. It also lands the base64
 value and the JSON object of PROTO-RESPONSE-3. PROG-CGI serves a client, and it
 lands OVW-PURPOSE-3 and OVW-PURPOSE-4. This plan also lands ARCH-DEPS-4,
-ARCH-LAYOUT-4, SEC-MEMORY-5 and OPS-WIPE-3. The deployment files are the work of
-plan 005, and its rc.d script lands SEC-SANDBOX-4. This plan runs the program
-directly, with the CGI variables in the environment.
+ARCH-LAYOUT-4, SEC-MEMORY-5 and OPS-WIPE-3. The root `Makefile` links the two
+programs static, so this plan also lands ARCH-STACK-3. Plan 005 lands each other
+rule of ARCH-STACK, and this change trims its citation. The deployment files are
+the work of plan 005, and its rc.d script lands SEC-SANDBOX-4. This plan runs
+the program directly, with the CGI variables in the environment.
 
 ## Purpose
 
@@ -75,6 +79,7 @@ as hex (PROG-KEYGEN-1 to PROG-KEYGEN-5).
 | `regress/Makefile`    | The `cgi` target                                       |
 | `regress/cgi.sh`      | The tests below                                        |
 | `spec/STATUS.md`      | The cited units                                        |
+| `plans/005-*/plan.md` | The trimmed ARCH-STACK citation                        |
 
 The manual page of the service states the weak deletion guarantee of the wipe
 and the compile-time paths (D-06).
@@ -108,6 +113,8 @@ environment and the body on standard input, and holds:
   each answer holds the 96-byte envelope of PROTO-RESPONSE-2, as base64 in the
   `data` member.
 - The log line holds the outcome class and no hex of the request.
+- Each program links static. `file` reports `statically linked` for `fuguoracle`
+  and for `fuguoracle-keygen`, which proves ARCH-DEPS-4 and ARCH-STACK-3.
 - The line count of the C sources stays near the target of ARCH-LAYOUT-4.
 
 The keygen test runs in the guest as root. It writes the key with mode `0400`
@@ -116,8 +123,9 @@ and the owner `_fuguoracle`, refuses a second run, and prints 66 hex digits.
 ## Acceptance
 
 - `make check` passes on the host, and `regress/guest` passes in the guest.
-- Every cited unit reads `done`, except SEC-SANDBOX, which reads `partial` with
-  SEC-SANDBOX-4 as the absent part.
+- Every cited unit reads `done`, except two. SEC-SANDBOX reads `partial` with
+  SEC-SANDBOX-4 as the absent part. ARCH-STACK reads `partial` with
+  ARCH-STACK-1, ARCH-STACK-2, ARCH-STACK-4 and ARCH-STACK-5 as the absent parts.
 - The change deletes this plan.
 
 The round trip through `httpd(8)` and `slowcgi(8)` belongs to plan 005, which
