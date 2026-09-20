@@ -78,6 +78,9 @@
 #define PATH_SET	"/set_pin"
 #define PATH_GET	"/get_pin"
 
+/* The outcome class of the liveness answer (SEC-LOGGING-2). */
+#define CLASS_LIVE	"ok_live"
+
 static const char	*class_name(enum oracle_outcome);
 static int		 read_key(uint8_t *);
 static enum http_status	 handle_post(enum oracle_op, struct oracle_response *,
@@ -85,7 +88,8 @@ static enum http_status	 handle_post(enum oracle_op, struct oracle_response *,
 
 /*
  * The name of one outcome class (SEC-LOGGING-2). The liveness answer
- * of GET / is a successful GET, so it carries ORACLE_OUT_OK_GET.
+ * of GET / carries no outcome of the state machine, and main() names
+ * it with CLASS_LIVE.
  */
 static const char *
 class_name(enum oracle_outcome outcome)
@@ -201,7 +205,7 @@ main(void)
 {
 	struct rlimit		 rl = { 0, 0 };
 	struct oracle_response	 res;
-	const char		*method, *uri;
+	const char		*method, *uri, *class = NULL;
 	enum oracle_outcome	 outcome = ORACLE_OUT_REJECT;
 	enum http_status	 status;
 	int			 rc;
@@ -230,13 +234,16 @@ main(void)
 	 * An unknown path answers 404, and a known path with another
 	 * method answers 405 (PROTO-HTTP-5). An absent variable
 	 * names no path and no method, so it answers 404.
+	 *
+	 * The liveness answer is no get_pin answer, so it carries a
+	 * class of its own (SEC-LOGGING-2).
 	 */
 	if (strcmp(uri, PATH_LIVE) == 0) {
 		if (strcmp(method, "GET") != 0)
 			status = HTTP_STATUS_BAD_METHOD;
 		else {
 			status = HTTP_STATUS_OK;
-			outcome = ORACLE_OUT_OK_GET;
+			class = CLASS_LIVE;
 		}
 	} else if (strcmp(uri, PATH_SET) == 0 || strcmp(uri, PATH_GET) == 0) {
 		if (strcmp(method, "POST") != 0)
@@ -258,6 +265,8 @@ main(void)
 		rc = http_respond(status);
 	if (rc != 0)
 		syslog(LOG_ERR, "the write of the answer failed");
-	syslog(LOG_INFO, "%s %d", class_name(outcome), status);
+	if (class == NULL)
+		class = class_name(outcome);
+	syslog(LOG_INFO, "%s %d", class, status);
 	return rc == 0 ? 0 : 1;
 }

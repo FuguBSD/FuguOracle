@@ -89,8 +89,9 @@ if (pledge("stdio rpath wpath cpath flock", NULL) == -1) err(1, "pledge");
   no log socket, it works inside the chroot, and the `stdio` pledge promise
   covers it.
 - **SEC-LOGGING-2** — The program must log one line per request with the outcome
-  class: `ok_set`, `ok_get`, `junk`, `reject`, or `error`. The program must log
-  wipe events prominently, and every I/O error.
+  class: `ok_set`, `ok_get`, `ok_live`, `junk`, `reject`, or `error`. The
+  liveness answer of `GET /` carries `ok_live`. The program must log wipe events
+  prominently, and every I/O error.
 - **SEC-LOGGING-3** — The program must not log key material, payloads, `cke`, or
   record names at the default level. Record names can appear at `LOG_DEBUG`
   only.

@@ -22,6 +22,10 @@
  * The file calls the shim of cipher.h for each cryptographic step,
  * and it includes no library header (ARCH-LAYOUT-1, ARCH-LAYOUT-2).
  *
+ * The wipe writes one log line of its own. The service answers a
+ * third strike like every other junk path, so the CGI entry cannot
+ * see a wipe (OPS-WIPE-3).
+ *
  * Each key and each plaintext lives in a stack buffer, and each exit
  * path clears it under one goto out (SEC-MEMORY-1, SEC-MEMORY-2).
  * The authenticator comparison runs in constant time (SEC-MEMORY-3).
@@ -37,6 +41,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "cipher.h"
@@ -476,6 +481,8 @@ pindb_wipe(const uint8_t *priv, const uint8_t *pubkey,
 		goto out;
 	if (unlink(path) == -1)
 		goto out;
+	/* The line names no record and no key material (SEC-LOGGING-3). */
+	syslog(LOG_WARNING, "a third strike destroyed a key share");
 	res = PINDB_OK;
 out:
 	/*
