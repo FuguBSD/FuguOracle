@@ -7,17 +7,17 @@ transcript pair. Plan 005 waits on it.
 
 Implements: OVW-PURPOSE, PROTO-HTTP, PROTO-ENVELOPE, PROTO-PAYLOAD,
 PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-LOGGING. Implements: SEC-SANDBOX
-without SEC-SANDBOX-4. Implements: ARCH-LAYOUT, SEC-MEMORY, OPS-SET, OPS-GET,
-OPS-JUNK, OPS-WIPE. Defers: DEPLOY-HTTPD, DEPLOY-SERVICE.
+without SEC-SANDBOX-4. Implements: ARCH-DEPS, ARCH-LAYOUT, SEC-MEMORY, OPS-SET,
+OPS-GET, OPS-JUNK, OPS-WIPE. Defers: DEPLOY-HTTPD, DEPLOY-SERVICE.
 
 This plan lands the absent part of each `partial` unit that it cites. PROTO-HTTP
 lands the error status of PROTO-ENVELOPE-2, PROTO-PAYLOAD-5, OPS-SET-7 and
 OPS-GET-7, and the status and the headers of OPS-JUNK. It also lands the base64
 value and the JSON object of PROTO-RESPONSE-3. PROG-CGI serves a client, and it
-lands OVW-PURPOSE-3 and OVW-PURPOSE-4. This plan also lands ARCH-LAYOUT-4,
-SEC-MEMORY-5 and OPS-WIPE-3. The deployment files are the work of plan 005, and
-its rc.d script lands SEC-SANDBOX-4. This plan runs the program directly, with
-the CGI variables in the environment.
+lands OVW-PURPOSE-3 and OVW-PURPOSE-4. This plan also lands ARCH-DEPS-4,
+ARCH-LAYOUT-4, SEC-MEMORY-5 and OPS-WIPE-3. The deployment files are the work of
+plan 005, and its rc.d script lands SEC-SANDBOX-4. This plan runs the program
+directly, with the CGI variables in the environment.
 
 ## Purpose
 
