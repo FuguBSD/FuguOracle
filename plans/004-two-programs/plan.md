@@ -89,11 +89,24 @@ environment and the body on standard input, and holds:
 - A `CONTENT_LENGTH` above 4096 answers `413`.
 - Malformed JSON, bad base64, a duplicate `data` member, and a short envelope
   answer `400`.
+- A payload of another length, a replayed `set_pin`, and a `get_pin` over a
+  record with no read permission each answer `500`. A payload length violation
+  and a signature recovery failure are internal failures (PROTO-PAYLOAD-5).
+  OPS-SET-7 gives every `set_pin` failure after envelope decryption an HTTP
+  error status. An I/O failure on load, and every persist failure, are internal
+  failures (OPS-GET-7). The test encrypts the payload of another length with the
+  request keys of the tweak vector in `regress/vectors.h`.
 - A `set_pin` and a `get_pin` round trip answer `200` with the header of
   PROTO-HTTP-6. The test reads the transcript pair of one client key from
   `regress/vectors.h`, and sends each request envelope as base64. The
   `replay_counter` of the `get_pin` envelope is above the counter of the
   `set_pin` envelope.
+- A wrong PIN, a missing record, and a replayed `get_pin` each answer `200` with
+  a valid response envelope (OPS-JUNK-1). The three junk paths answer one
+  identical status and one identical header set. OPS-JUNK-2 makes the status,
+  the headers, and the envelope size identical on every junk path. The body of
+  each answer holds the 96-byte envelope of PROTO-RESPONSE-2, as base64 in the
+  `data` member.
 - The log line holds the outcome class and no hex of the request.
 - The line count of the C sources stays near the target of ARCH-LAYOUT-4.
 
