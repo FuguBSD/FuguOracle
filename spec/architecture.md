@@ -108,7 +108,8 @@ fuguoracle/
   reviewable place.
 - **ARCH-LAYOUT-3** — The build must use `-Wall -Wextra -Werror`.
 - **ARCH-LAYOUT-4** — The target size of the implementation is about 1,500 lines
-  of C.
+  of C. The count reads the lines of the `.c` files outside the comments and the
+  blank lines.
 - **ARCH-LAYOUT-5** — The shim and the record store can each hold an entry point
   that the tests alone reach. `#ifdef REGRESS` must guard each such entry point.
   A shim entry point can compute a client answer, because a known-answer vector

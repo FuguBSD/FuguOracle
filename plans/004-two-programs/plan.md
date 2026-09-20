@@ -113,8 +113,9 @@ environment and the body on standard input, and holds:
   each answer holds the 96-byte envelope of PROTO-RESPONSE-2, as base64 in the
   `data` member.
 - The log line holds the outcome class and no hex of the request.
-- Each program links static. `file` reports `statically linked` for `fuguoracle`
-  and for `fuguoracle-keygen`, which proves ARCH-DEPS-4 and ARCH-STACK-3.
+- Each program links static. `ldd` prints one `dlib` line and no `rlib` line for
+  `fuguoracle` and for `fuguoracle-keygen`, which proves ARCH-DEPS-4 and
+  ARCH-STACK-3.
 - The line count of the C sources stays near the target of ARCH-LAYOUT-4.
 
 The keygen test runs in the guest as root. It writes the key with mode `0400`
