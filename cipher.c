@@ -222,6 +222,36 @@ cipher_hmac_sha256(const uint8_t *key, size_t key_len, const uint8_t *msg,
 	    CIPHER_HASH_LEN);
 }
 
+int
+cipher_pubkey(const uint8_t *priv, uint8_t *out)
+{
+	secp256k1_context	*ctx;
+	secp256k1_pubkey	 pubkey;
+	size_t			 len = CIPHER_PUBKEY_LEN;
+	int			 rc = -1;
+
+	memset(&pubkey, 0, sizeof(pubkey));
+	if ((ctx = context()) == NULL)
+		goto out;
+
+	/* The verify step answers the draw of the key generator. */
+	if (secp256k1_ec_seckey_verify(ctx, priv) != 1)
+		goto out;
+	if (secp256k1_ec_pubkey_create(ctx, &pubkey, priv) != 1)
+		goto out;
+	if (secp256k1_ec_pubkey_serialize(ctx, out, &len, &pubkey,
+	    SECP256K1_EC_COMPRESSED) != 1)
+		goto out;
+	if (len != CIPHER_PUBKEY_LEN)
+		goto out;
+	rc = 0;
+out:
+	explicit_bzero(&pubkey, sizeof(pubkey));
+	if (rc != 0)
+		explicit_bzero(out, CIPHER_PUBKEY_LEN);
+	return rc;
+}
+
 /*
  * The tweak input m = H(HMAC(key = cke, msg = replay_counter)) of one
  * request (PROTO-TWEAK-1). The counter travels in little-endian byte

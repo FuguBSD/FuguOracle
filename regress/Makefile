@@ -13,9 +13,9 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# The regression tests. `make regress` builds kat, unit and ops, and
-# it runs each of them. The vectors are committed as hex, so the run
-# needs no Python and no network (TEST-KAT-2).
+# The regression tests. `make regress` builds kat, unit, ops and cgi,
+# and it runs each of them. The vectors are committed as hex, so the
+# run needs no Python and no network (TEST-KAT-2).
 #
 # The regress build defines REGRESS, so each draw of the seam comes
 # from the file that FUGUORACLE_RANDOM names (SEC-RANDOM-2). The
@@ -25,14 +25,29 @@
 # (ARCH-LAYOUT-5).
 #
 # The unit tests and the tests of the operations write records, so
-# this build names a record directory of the regress tree. The path
-# stays a compile-time constant (D-06), and each program empties that
-# directory before a case.
+# this build names a record directory of the regress tree. The cgi
+# program reads a static key, so this build names a key file of the
+# regress tree as well. Each path stays a compile-time constant
+# (D-06).
+#
+# cgi holds the source of the service program, and cgi.sh drives it
+# with the CGI variables in the environment (PROG-CGI-1). A bare run
+# of that program answers one request and it tests nothing, so
+# REGRESS_TARGETS names run-cgi in place of the default target of
+# the program.
+#
+# keygen.sh tests the key generator, and the root Makefile builds
+# that program. The key file and the owner of PROG-KEYGEN-2 hold no
+# build flag, so the program writes /var/www and it reads the passwd
+# entry of _fuguoracle. run-keygen therefore names the program of the
+# source directory, and the test needs root. A run without root
+# reports the skip, and it passes.
 
-PROGS=		kat unit ops
+PROGS=		kat unit ops cgi
 SRCS_kat=	kat.c cipher.c
 SRCS_unit=	unit.c pindb.c cipher.c
 SRCS_ops=	ops.c oracle.c pindb.c cipher.c
+SRCS_cgi=	main.c http.c oracle.c pindb.c cipher.c
 
 .PATH:		${.CURDIR}/..
 
@@ -40,10 +55,23 @@ LOCALBASE?=	/usr/local
 
 CFLAGS+=	-Wall -Wextra -Werror -DREGRESS
 CFLAGS+=	-DPINS_DIR='"${.OBJDIR}/pins"'
+CFLAGS+=	-DKEY_PATH='"${.OBJDIR}/private.key"'
 CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/.. -I${LOCALBASE}/include
 LDFLAGS+=	-static -L${LOCALBASE}/lib
 LDADD=		-lsecp256k1 -lcrypto
 DPADD=		${LOCALBASE}/lib/libsecp256k1.a ${LIBCRYPTO}
-CLEANFILES+=	pins/* unit.random.* ops.random.*
+CLEANFILES+=	pins/* pins/.random cgi.work/* keygen.work/* \
+		private.key unit.random.* ops.random.*
+
+REGRESS_TARGETS=	run-regress-kat run-regress-unit run-regress-ops \
+			run-cgi run-keygen
+
+run-cgi: cgi
+	sh ${.CURDIR}/cgi.sh ${.OBJDIR}/cgi ${.OBJDIR}
+
+run-keygen:
+	sh ${.CURDIR}/keygen.sh ${.CURDIR}/../fuguoracle-keygen ${.OBJDIR}
+
+.PHONY: run-cgi run-keygen
 
 .include <bsd.regress.mk>

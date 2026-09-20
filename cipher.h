@@ -75,6 +75,16 @@ int	cipher_sha256(const uint8_t *, size_t, uint8_t *);
 int	cipher_hmac_sha256(const uint8_t *, size_t, const uint8_t *, size_t,
 	    uint8_t *);
 
+/*
+ * cipher_pubkey(priv, out):
+ *	The public key of a private key, in the compressed form.
+ *	priv holds CIPHER_KEY_LEN bytes, and out takes
+ *	CIPHER_PUBKEY_LEN bytes. The call verifies priv first, so a
+ *	scalar outside the range of the curve answers -1. The key
+ *	generator draws until the call answers 0 (PROG-KEYGEN-1).
+ */
+int	cipher_pubkey(const uint8_t *, uint8_t *);
+
 #ifdef REGRESS
 /*
  * cipher_tweak_input(cke, counter, out):
