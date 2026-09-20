@@ -35,6 +35,13 @@
 # of that program answers one request and it tests nothing, so
 # REGRESS_TARGETS names run-cgi in place of the default target of
 # the program.
+#
+# keygen.sh tests the key generator, and the root Makefile builds
+# that program. The key file and the owner of PROG-KEYGEN-2 hold no
+# build flag, so the program writes /var/www and it reads the passwd
+# entry of _fuguoracle. run-keygen therefore names the program of the
+# source directory, and the test needs root. A run without root
+# reports the skip, and it passes.
 
 PROGS=		kat unit ops cgi
 SRCS_kat=	kat.c cipher.c
@@ -53,15 +60,18 @@ CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/.. -I${LOCALBASE}/include
 LDFLAGS+=	-static -L${LOCALBASE}/lib
 LDADD=		-lsecp256k1 -lcrypto
 DPADD=		${LOCALBASE}/lib/libsecp256k1.a ${LIBCRYPTO}
-CLEANFILES+=	pins/* pins/.random cgi.work/* private.key \
-		unit.random.* ops.random.*
+CLEANFILES+=	pins/* pins/.random cgi.work/* keygen.work/* \
+		private.key unit.random.* ops.random.*
 
 REGRESS_TARGETS=	run-regress-kat run-regress-unit run-regress-ops \
-			run-cgi
+			run-cgi run-keygen
 
 run-cgi: cgi
 	sh ${.CURDIR}/cgi.sh ${.OBJDIR}/cgi ${.OBJDIR}
 
-.PHONY: run-cgi
+run-keygen:
+	sh ${.CURDIR}/keygen.sh ${.CURDIR}/../fuguoracle-keygen ${.OBJDIR}
+
+.PHONY: run-cgi run-keygen
 
 .include <bsd.regress.mk>
