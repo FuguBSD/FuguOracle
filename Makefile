@@ -16,11 +16,15 @@
 # The build of the source. OpenBSD make reads this file, and GNU make
 # reads GNUmakefile for the document gates.
 #
-# The default target builds fuguoracle, the program of PROG-CGI. It
-# links the archive of the port and the archive of the base system,
-# because the service runs inside the /var/www chroot (ARCH-STACK-3,
-# ARCH-DEPS-4). The program of PROG-KEYGEN adds keygen.c to the list
-# below, and this file then links it as well.
+# The default target builds the two programs: fuguoracle, the program
+# of PROG-CGI, and fuguoracle-keygen, the program of PROG-KEYGEN.
+# Each one links the archive of the port and the archive of the base
+# system, because the service runs inside the /var/www chroot
+# (ARCH-STACK-3, ARCH-DEPS-4). The key generator runs outside the
+# chroot, and one LDFLAGS line links both programs static.
+#
+# The key generator needs the shim of cipher.c beside its own source,
+# because only that file holds a library call (ARCH-LAYOUT-1).
 #
 # MAN is empty, because this directory holds no manual page today.
 #
@@ -31,8 +35,9 @@
 # tests and the tests of the operations. It links the archive of the
 # port and the archive of the base system as well.
 
-PROGS=			fuguoracle
+PROGS=			fuguoracle fuguoracle-keygen
 SRCS_fuguoracle=	main.c http.c cipher.c oracle.c pindb.c
+SRCS_fuguoracle-keygen=	keygen.c cipher.c
 MAN=
 
 LOCALBASE?=	/usr/local
