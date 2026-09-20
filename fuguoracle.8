@@ -1,0 +1,264 @@
+.\" $OpenBSD$
+.\"
+.\" Copyright (c) 2026 Dick Olsson <hi@senzilla.io>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: September 20 2026 $
+.Dt FUGUORACLE 8
+.Os
+.Sh NAME
+.Nm fuguoracle
+.Nd blind PIN oracle service
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+is the CGI program of the blind PIN oracle.
+.Xr slowcgi 8
+runs one process of it for each request, and
+.Xr httpd 8
+sends each request to
+.Xr slowcgi 8 .
+The program takes no argument and no option.
+It reads no configuration file.
+.Pp
+The oracle holds one key share for each client.
+It releases the share to a request that proves the correct PIN, and it
+destroys the share after three wrong PINs.
+It does not learn the PIN, and it does not learn the secret of the
+client.
+The wire behavior follows version 2 of the upstream
+.Sy blind_pin_server
+protocol.
+.Pp
+The program answers three endpoints:
+.Bl -column "POST /set_pin" "a request envelope" "200, a response envelope"
+.It Sy Request Ta Sy Body Ta Sy Answer
+.It Li "GET /" Ta none Ta 200, an empty body
+.It Li "POST /set_pin" Ta a request envelope Ta 200, a response envelope
+.It Li "POST /get_pin" Ta a request envelope Ta 200, a response envelope
+.El
+.Pp
+.Li GET /
+is the liveness endpoint.
+.Li POST /set_pin
+stores a new key share for the client, and
+.Li POST /get_pin
+releases the stored share to the correct PIN.
+.Pp
+The body of a POST request is one JSON object.
+The object holds one member with the name
+.Li data ,
+and the value of that member holds the base64 of the request envelope:
+.Bd -literal -offset indent
+{"data": "<base64>"}
+.Ed
+.Pp
+The JSON reader is a small scanner, and the program uses no JSON
+library.
+The scanner accepts insignificant whitespace, and it ignores an
+unknown member.
+It rejects a second
+.Li data
+member, an escape sequence in the value, and each other shape.
+The program reads exactly
+.Ev CONTENT_LENGTH
+bytes of the body, and it rejects a body above 4096 bytes.
+It does not read the
+.Ql Content-Type
+header of the request.
+.Pp
+A 200 answer to a POST request carries the header
+.Ql Content-Type: application/json ,
+and a body of the shape above.
+The value of the
+.Li data
+member then holds the base64 of the response envelope.
+The liveness answer and each error answer carry an empty body.
+.Pp
+The table below holds the answer of each failure class:
+.Bl -column "An envelope MAC or decrypt failure" "200, a junk key" "set_pin"
+.It Sy Failure Ta Sy get_pin Ta Sy set_pin
+.It "An unknown path or a wrong method" Ta 404 or 405 Ta 404 or 405
+.It "A body above 4096 bytes" Ta 413 Ta 413
+.It "Malformed JSON or bad base64" Ta 400 Ta 400
+.It "An envelope length violation" Ta 400 Ta 400
+.It "An envelope MAC or decrypt failure" Ta 500 Ta 500
+.It "A payload extraction failure" Ta 500 Ta 500
+.It "No entropy in the payload" Ta normal Ta 500
+.It "A missing record" Ta 200, a junk key Ta normal
+.It "A corrupt record" Ta 200, a junk key Ta 500
+.It "A replay violation" Ta 200, a junk key Ta 500
+.It "A wrong PIN" Ta 200, a junk key Ta not applicable
+.It "An I/O or persist failure" Ta 500 Ta 500
+.El
+.Pp
+The word normal in the table names a request that does not fail.
+A
+.Li get_pin
+request ignores the entropy of its payload, and a
+.Li set_pin
+request creates a record that is absent.
+The
+.Li set_pin
+endpoint proves no PIN, so a wrong PIN cannot reach it.
+.Pp
+A junk key is the answer of the junk path.
+The program answers 200 with a valid response envelope, and the
+payload of that envelope holds a fresh random key.
+The status, the headers, and the envelope size are identical on each
+junk path.
+The client detects the junk key by the failure of its own decrypt
+step, and the response bytes give no other signal.
+The response time can differ between a junk path that writes and one
+that does not, and the design accepts this difference.
+.Pp
+Each
+.Li get_pin
+request with a wrong PIN counts one strike, and a correct PIN sets the
+count back to zero.
+The third strike destroys the key share.
+The program overwrites the record file in place with a dead record, it
+calls
+.Xr fsync 2 ,
+and it removes the file.
+The client cannot recover its secret through this service after the
+wipe.
+.Sh ENVIRONMENT
+.Xr httpd 8
+and
+.Xr slowcgi 8
+set these variables, and
+.Nm
+reads them:
+.Bl -tag -width CONTENT_LENGTH
+.It Ev REQUEST_METHOD
+The method of the request.
+The accepted values are GET for the liveness endpoint and POST for the
+two other endpoints.
+A known path with another method answers 405.
+.It Ev DOCUMENT_URI
+The decoded path of the request.
+It names the endpoint, and each other path answers 404.
+.It Ev CONTENT_LENGTH
+The length of the request body, in bytes.
+It must be a decimal number of at most 4096.
+.El
+.Pp
+.Nm
+reads no other variable, and no variable holds a configuration value.
+.Sh FILES
+The two paths are compile-time constants, and each one is relative to
+the
+.Pa /var/www
+chroot of
+.Xr slowcgi 8 .
+An operator cannot move a path without a new build.
+.Bl -tag -width "/fuguoracle/private.key"
+.It Pa /fuguoracle/private.key
+The static key of the service, 32 raw bytes.
+.Xr fuguoracle-keygen 8
+makes this file.
+.It Pa /fuguoracle/pins/
+The record directory.
+One flat file holds the record of one client.
+.El
+.Pp
+A program outside the chroot reads the same two paths as
+.Pa /var/www/fuguoracle/private.key
+and
+.Pa /var/www/fuguoracle/pins/ .
+.Sh EXIT STATUS
+.Nm
+exits 0 after it writes an answer.
+It exits 1 when a sandbox call fails, or when the write of the answer
+fails.
+.Sh DIAGNOSTICS
+.Nm
+logs with
+.Xr syslog 3 ,
+under the name fuguoracle and the facility LOG_DAEMON.
+It writes one line at LOG_INFO for each request, and that line holds
+the outcome class and the HTTP status:
+.Bd -literal -offset indent
+fuguoracle[28143]: ok_get 200
+.Ed
+.Pp
+The outcome classes are:
+.Bl -tag -width ok_live -compact
+.It Li ok_live
+The liveness answer of
+.Li GET / .
+.It Li ok_set
+A
+.Li set_pin
+request stored a new key share.
+.It Li ok_get
+A
+.Li get_pin
+request released the stored key share.
+.It Li junk
+A
+.Li get_pin
+request took the junk path.
+.It Li reject
+The program refused the request.
+An unknown path, a wrong method, a malformed body, a body above the
+cap, and a short envelope each take this class.
+.It Li error
+The request failed inside the oracle, or an I/O call failed.
+.El
+.Pp
+A third-strike wipe logs one line at LOG_WARNING, and each I/O failure
+logs one line at LOG_ERR.
+No line holds key material, a payload, or a record name.
+.Sh SEE ALSO
+.Xr pledge 2 ,
+.Xr unveil 2 ,
+.Xr syslog 3 ,
+.Xr fuguoracle-keygen 8 ,
+.Xr httpd 8 ,
+.Xr slowcgi 8
+.Sh AUTHORS
+.An Dick Olsson Aq Mt hi@senzilla.io
+.Sh SECURITY CONSIDERATIONS
+The overwrite of a wiped record is a best effort against media
+recovery.
+FFS and SSD hardware give no overwrite guarantee, so the old blocks of
+the record can stay readable on the disk.
+The deletion guarantee of the wipe is weak for that reason.
+The wiped record is also dead by its content: the key share of the
+overwritten record is zero, and the file is gone.
+.Pp
+.Nm
+sets the core limit to zero, and it applies
+.Xr pledge 2
+and
+.Xr unveil 2
+before it reads one request byte.
+The promises after the unveil calls are
+.Ql stdio rpath wpath cpath flock .
+The program unveils the key file read-only, and the record directory
+with the permissions
+.Ql rwc .
+.Pp
+.Xr slowcgi 8
+must run
+.Nm
+inside the
+.Pa /var/www
+chroot, as the user _fuguoracle.
+The
+.Xr httpd 8
+workers then cannot read the key file.

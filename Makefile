@@ -26,7 +26,9 @@
 # The key generator needs the shim of cipher.c beside its own source,
 # because only that file holds a library call (ARCH-LAYOUT-1).
 #
-# MAN is empty, because this directory holds no manual page today.
+# MAN names the two manual pages of the two programs, in mdoc(7).
+# bsd.prog.mk defaults MAN to one page of section 1 for each name of
+# PROGS, so this line names the two pages of section 8 instead.
 #
 # This build defines no REGRESS, no PINS_DIR and no KEY_PATH, so it
 # holds no test hook, and it names the two paths of PROG-CGI-4.
@@ -38,7 +40,7 @@
 PROGS=			fuguoracle fuguoracle-keygen
 SRCS_fuguoracle=	main.c http.c cipher.c oracle.c pindb.c
 SRCS_fuguoracle-keygen=	keygen.c cipher.c
-MAN=
+MAN=			fuguoracle.8 fuguoracle-keygen.8
 
 LOCALBASE?=	/usr/local
 

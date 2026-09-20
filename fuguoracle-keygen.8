@@ -1,0 +1,84 @@
+.\" $OpenBSD$
+.\"
+.\" Copyright (c) 2026 Dick Olsson <hi@senzilla.io>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: September 20 2026 $
+.Dt FUGUORACLE-KEYGEN 8
+.Os
+.Sh NAME
+.Nm fuguoracle-keygen
+.Nd make the static key of the blind PIN oracle
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+makes the static key of
+.Xr fuguoracle 8 .
+The operator runs it one time, as root, and outside the
+.Pa /var/www
+chroot.
+It takes no argument and no option.
+.Pp
+The program draws 32 random bytes, and it repeats the draw while the
+value sits outside the range of the curve.
+It writes the key to
+.Pa /var/www/fuguoracle/private.key ,
+with the owner and the group _fuguoracle, and the mode 0400.
+The path is a compile-time constant, and an operator cannot move it
+without a new build.
+.Pp
+.Nm
+refuses to overwrite an existing key file.
+It creates the file with
+.Dv O_EXCL ,
+so a second run stops with an error and leaves the key of the service
+as it is.
+.Pp
+The program prints the compressed public key on one line of standard
+output, as 66 hex digits.
+The operator provisions that value into each client, and a client
+needs it before it sends the first request.
+.Sh FILES
+.Bl -tag -width "/var/www/fuguoracle/private.key"
+.It Pa /var/www/fuguoracle/private.key
+The static key of the service, 32 raw bytes.
+.Xr fuguoracle 8
+reads the same file as
+.Pa /fuguoracle/private.key ,
+inside the
+.Pa /var/www
+chroot.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr pledge 2 ,
+.Xr unveil 2 ,
+.Xr fuguoracle 8
+.Sh AUTHORS
+.An Dick Olsson Aq Mt hi@senzilla.io
+.Sh SECURITY CONSIDERATIONS
+The static key is the secret of the whole service.
+.Nm
+writes the file with the mode 0400 and the owner _fuguoracle, so only
+that user and root can read it.
+.Pp
+The program sets the core limit to zero, and it applies
+.Xr pledge 2
+and
+.Xr unveil 2 .
+It unveils the target directory alone.
+The key stays in one buffer, and each exit path clears that buffer.
+A failure after the creation of the file removes the file.
