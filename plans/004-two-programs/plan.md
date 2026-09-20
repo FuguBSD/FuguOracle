@@ -2,17 +2,21 @@
 
 ## Status
 
-Proposed. It waits on plan 003 for the operations, and on plan 001 for the
-transcript pair of the round-trip test. Plan 005 waits on it.
+Proposed. It can land now, because the tree holds the operations and the
+transcript pair. Plan 005 waits on it.
 
-Implements: PROTO-HTTP, PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-LOGGING.
-Implements: SEC-SANDBOX without SEC-SANDBOX-4. Implements: ARCH-LAYOUT,
-SEC-MEMORY, OPS-WIPE. Defers: DEPLOY-HTTPD, DEPLOY-SERVICE.
+Implements: OVW-PURPOSE, PROTO-HTTP, PROTO-ENVELOPE, PROTO-PAYLOAD,
+PROTO-RESPONSE, PROG-CGI, PROG-KEYGEN, SEC-LOGGING. Implements: SEC-SANDBOX
+without SEC-SANDBOX-4. Implements: ARCH-DEPS, ARCH-LAYOUT, SEC-MEMORY, OPS-SET,
+OPS-GET, OPS-JUNK, OPS-WIPE. Defers: DEPLOY-HTTPD, DEPLOY-SERVICE.
 
-Of the five shared units, this plan lands ARCH-LAYOUT-4, SEC-MEMORY-5,
-OPS-WIPE-3, and PROTO-RESPONSE-3, and those four units reach `done`. Plan 003
-lands the other two rules of PROTO-RESPONSE. The deployment files are the work
-of plan 005, and its rc.d script lands SEC-SANDBOX-4. This plan runs the program
+This plan lands the absent part of each `partial` unit that it cites. PROTO-HTTP
+lands the error status of PROTO-ENVELOPE-2, PROTO-PAYLOAD-5, OPS-SET-7 and
+OPS-GET-7, and the status and the headers of OPS-JUNK. It also lands the base64
+value and the JSON object of PROTO-RESPONSE-3. PROG-CGI serves a client, and it
+lands OVW-PURPOSE-3 and OVW-PURPOSE-4. This plan also lands ARCH-DEPS-4,
+ARCH-LAYOUT-4, SEC-MEMORY-5 and OPS-WIPE-3. The deployment files are the work of
+plan 005, and its rc.d script lands SEC-SANDBOX-4. This plan runs the program
 directly, with the CGI variables in the environment.
 
 ## Purpose
@@ -85,11 +89,24 @@ environment and the body on standard input, and holds:
 - A `CONTENT_LENGTH` above 4096 answers `413`.
 - Malformed JSON, bad base64, a duplicate `data` member, and a short envelope
   answer `400`.
+- A payload of another length, a replayed `set_pin`, and a `get_pin` over a
+  record with no read permission each answer `500`. A payload length violation
+  and a signature recovery failure are internal failures (PROTO-PAYLOAD-5).
+  OPS-SET-7 gives every `set_pin` failure after envelope decryption an HTTP
+  error status. An I/O failure on load, and every persist failure, are internal
+  failures (OPS-GET-7). The test encrypts the payload of another length with the
+  request keys of the tweak vector in `regress/vectors.h`.
 - A `set_pin` and a `get_pin` round trip answer `200` with the header of
   PROTO-HTTP-6. The test reads the transcript pair of one client key from
   `regress/vectors.h`, and sends each request envelope as base64. The
   `replay_counter` of the `get_pin` envelope is above the counter of the
   `set_pin` envelope.
+- A wrong PIN, a missing record, and a replayed `get_pin` each answer `200` with
+  a valid response envelope (OPS-JUNK-1). The three junk paths answer one
+  identical status and one identical header set. OPS-JUNK-2 makes the status,
+  the headers, and the envelope size identical on every junk path. The body of
+  each answer holds the 96-byte envelope of PROTO-RESPONSE-2, as base64 in the
+  `data` member.
 - The log line holds the outcome class and no hex of the request.
 - The line count of the C sources stays near the target of ARCH-LAYOUT-4.
 

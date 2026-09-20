@@ -528,6 +528,47 @@ out:
 	return rc;
 }
 
+#ifdef REGRESS
+/*
+ * The signature of a payload answers a client, because the service
+ * holds no client key (PROTO-PAYLOAD-2). The regress build compiles
+ * it, and the service program carries no client-side curve code
+ * (ARCH-LAYOUT-2, ARCH-LAYOUT-5). The nonce comes from the default
+ * function of the library, so the answer draws nothing from the
+ * seam (SEC-RANDOM-2).
+ */
+int
+cipher_sign_recoverable(const uint8_t *priv, const uint8_t *msghash,
+    uint8_t *out)
+{
+	secp256k1_context			*ctx;
+	secp256k1_ecdsa_recoverable_signature	 rsig;
+	int					 recid = -1;
+	int					 rc = -1;
+
+	memset(&rsig, 0, sizeof(rsig));
+	if ((ctx = context()) == NULL)
+		goto out;
+	if (secp256k1_ecdsa_sign_recoverable(ctx, &rsig, msghash, priv, NULL,
+	    NULL) != 1)
+		goto out;
+	if (secp256k1_ecdsa_recoverable_signature_serialize_compact(ctx,
+	    out + 1, &recid, &rsig) != 1)
+		goto out;
+	if (recid < 0 || recid > 3)
+		goto out;
+
+	/* The header byte of the libwally form marks a compressed key. */
+	out[0] = (uint8_t)(27 + 4 + recid);
+	rc = 0;
+out:
+	explicit_bzero(&rsig, sizeof(rsig));
+	if (rc != 0)
+		explicit_bzero(out, CIPHER_SIG_LEN);
+	return rc;
+}
+#endif
+
 int
 cipher_recover_pubkey(const uint8_t *msghash, const uint8_t *sig,
     uint8_t *out)
