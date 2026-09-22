@@ -67,19 +67,40 @@ sub _synced ($path)
 # _vendored($path):
 #	True when a verbatim copy of an upstream release holds the
 #	file. The SOURCE.md of such a directory forbids an edit of
-#	every file beside it, so no word rule can reach one. That
-#	record is a file of this repository, and the scan reads it.
+#	each file that it pins, so no word rule can reach one. That
+#	record pins a file in one table row: the name of the file as
+#	inline code, then the SHA-256 of it. A file of no such row
+#	stays inside the scan, and the record itself stays there as
+#	well.
 sub _vendored ($path)
 {
 	return 0 if $path =~ m{(?:\A|/)SOURCE[.]md\z};
-	my ($dir) = $path =~ m{\A(.*)/[^/]+\z} or return 0;
-	my $text  = _slurp("$dir/SOURCE.md") // return 0;
-	return $text =~ /Do not edit a file of this directory/;
+	my ( $dir, $file ) = $path =~ m{\A(.*)/([^/]+)\z} or return 0;
+	my $text = _slurp("$dir/SOURCE.md") // return 0;
+	return 0 if $text !~ /Do not edit a file of this directory/;
+	return $text =~ /^[|]\s*`\Q$file\E`\s*[|]\s*`[0-9a-f]{64}`\s*[|]/m
+	    ? 1
+	    : 0;
 }
 
+my @tracked = `git ls-files --cached --others --exclude-standard`;
+chomp @tracked;
+
+# The negative control of the exemption. Each path below names a
+# file that no record pins: one of every directory that holds a
+# record, and one of a directory that holds none. A predicate that
+# exempts a whole directory, and a predicate that exempts every
+# path, each give true for one of them.
+my @control = 'no-such-directory/no-such-file';
+for my $path (@tracked) {
+	next if $path !~ m{(?:\A|/)SOURCE[.]md\z};
+	push @control, $path =~ s{[^/]+\z}{no-such-file}r;
+}
+is( scalar( grep { _vendored($_) } @control ),
+	0, 'the exemption of a vendored copy needs a digest of the file' );
+
 my @hits;
-for my $path (`git ls-files --cached --others --exclude-standard`) {
-	chomp $path;
+for my $path (@tracked) {
 
 	# A port names its upstream, and the ports tree fixes that
 	# name, so a file under ports/ is outside the rule. A
