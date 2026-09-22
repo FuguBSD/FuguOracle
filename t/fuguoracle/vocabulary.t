@@ -10,7 +10,7 @@ use warnings;
 use experimental 'signatures';
 no feature qw(indirect multidimensional bareword_filehandles);
 use Test::More;
-use FindBin qw($RealBin $RealScript);
+use FindBin    qw($RealBin $RealScript);
 use File::Spec ();
 
 my $root = "$RealBin/../..";
@@ -38,7 +38,7 @@ sub _blank ($text)
 
 # The rule names each word as inline code: the word `w`. The
 # formatter can wrap between the two, so the match spans a line feed.
-my $spec = _slurp('spec/overview.md') // BAIL_OUT("spec/overview.md: $!");
+my $spec  = _slurp('spec/overview.md') // BAIL_OUT("spec/overview.md: $!");
 my @words = $spec =~ /the word\s+`([a-z]+)`/g;
 is( scalar @words, 5, 'spec/overview.md names five banned words' );
 
