@@ -64,17 +64,33 @@ sub _synced ($path)
 	return $head =~ /pack of FuguBSD\/Tooling owns this file/;
 }
 
+# _vendored($path):
+#	True when a verbatim copy of an upstream release holds the
+#	file. The SOURCE.md of such a directory forbids an edit of
+#	every file beside it, so no word rule can reach one. That
+#	record is a file of this repository, and the scan reads it.
+sub _vendored ($path)
+{
+	return 0 if $path =~ m{(?:\A|/)SOURCE[.]md\z};
+	my ($dir) = $path =~ m{\A(.*)/[^/]+\z} or return 0;
+	my $text  = _slurp("$dir/SOURCE.md") // return 0;
+	return $text =~ /Do not edit a file of this directory/;
+}
+
 my @hits;
 for my $path (`git ls-files --cached --others --exclude-standard`) {
 	chomp $path;
 
 	# A port names its upstream, and the ports tree fixes that
-	# name, so a file under ports/ is outside the rule.
+	# name, so a file under ports/ is outside the rule. A
+	# vendored copy is outside it as well: an edit of such a file
+	# breaks the digest that its record pins.
 	next
 	    if $path eq $self
 	    || $path =~ m{^docs/research/}
 	    || $path =~ m{^ports/}
-	    || _synced($path);
+	    || _synced($path)
+	    || _vendored($path);
 	my $text = _slurp($path) // next;
 
 	# A fenced code block and an inline code span hold names, not
