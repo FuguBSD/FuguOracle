@@ -15,22 +15,27 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# interop: run the upstream test suite against the stack in the guest.
+# interop: run the upstream test suite and the checks against the
+# stack in the guest.
 #
 # usage: make interop
 #
-# This program is the interop harness of TEST-INTEROP. It is no .t
-# file, and make check never runs it: it needs an OpenBSD guest, the
-# fuguvm tool, and a checkout of the upstream server. mk/local.mk
-# holds the interop target, and that target is the one caller.
+# This program is the interop harness of TEST-INTEROP and the
+# acceptance of TEST-ACCEPT. It is no .t file, and make check never
+# runs it: it needs an OpenBSD guest, the fuguvm tool, and a checkout
+# of the upstream server. mk/local.mk holds the interop target, and
+# that target is the one caller.
 #
 # The harness runs on the host, on the Fugu library. It runs fuguvm
 # as a command only, with Fugu::Process and an argument list, and it
-# loads no App::FuguVM module (TEST-INTEROP-4). A guest step is one
-# 'fuguvm ssh -- sh -c <script>' call, so a step takes a redirect and
-# a pipe, and each step is one call (TEST-INTEROP-4). The harness
-# reads the exit code of each fuguvm call (TEST-INTEROP-5), and it
-# stops at the first failed step with the output of that step.
+# loads no App::FuguVM module (TEST-INTEROP-4). Each child gets its
+# environment through the env option of Fugu::Process: the
+# environment of the harness, and the fuguvm command (TEST-ACCEPT-3).
+# A guest step is one 'fuguvm ssh -- sh -c <script>' call, so a step
+# takes a redirect and a pipe, and each step is one call
+# (TEST-INTEROP-4). The harness reads the exit code of each fuguvm
+# call (TEST-INTEROP-5), and it stops at the first failed step with
+# the output of that step.
 #
 # The guest is the guest of the .fuguvmrc of this repository. That
 # file is local and untracked: it names a state directory of its own,
@@ -55,25 +60,58 @@
 #
 # The second part deploys the tree. The harness puts the tracked files
 # of the working tree into the guest with 'fuguvm put', and the guest
-# builds them (ARCH-DEPS-5). One step creates the service account and
-# the two directories of PKG-ORACLE-2 and PKG-ORACLE-3. One step
-# installs the CGI program into the httpd chroot and the key
-# generator into /usr/local/sbin. The harness puts the rc.d script
-# and the httpd.conf fragment of ports/security/fuguoracle in the
-# same way (TEST-INTEROP-7). The test config differs from the
-# fragment in the listen line alone: a sed of the guest puts
-# 'listen on lo0 port 8080' in place of the TLS listen line, and it
-# removes the tls block, because the test needs no certificate.
-# fuguoracle-keygen then makes a fresh key, and rcctl starts httpd and
-# the fuguoracle service.
+# builds them (ARCH-DEPS-5). The guest builds the CGI program a second
+# time, as the regress build of regress/Makefile with the two paths of
+# a second instance inside the httpd chroot: its own record directory
+# and its own key file under /fuguoracle-fixed. One step creates the
+# service account and the two directories of PKG-ORACLE-2 and
+# PKG-ORACLE-3, and the same two directories of the fixed instance.
+# One step installs the CGI program into the httpd chroot, the regress
+# build beside it as fuguoracle-fixed, and the key generator into
+# /usr/local/sbin. The harness puts the rc.d script and the httpd.conf
+# fragment of ports/security/fuguoracle in the same way
+# (TEST-INTEROP-7). The test config holds two server blocks. The first
+# one is the fragment with 'listen on lo0 port 8080' in place of the
+# TLS listen line and without the tls block, because the test needs no
+# certificate. The second one is the fragment again, on port 8081,
+# with the second program in place of the first and one more FastCGI
+# parameter: FUGUORACLE_RANDOM, the fixed random file, so the seam of
+# the regress build reads that file (SEC-RANDOM-2). slowcgi(8) runs
+# the program that SCRIPT_FILENAME names and holds no state of a
+# program, so both blocks name the one socket of the rc.d script.
+# fuguoracle-keygen then makes a fresh key, and the fixed instance
+# gets a copy of it. rcctl starts httpd and the fuguoracle service.
+# The harness then starts regress/upstream-fixed.py: the upstream
+# server on a copy of the same key and on the same random file, on
+# port 8082 (D-12). That start is one simple command in the
+# background, and no compound list: ksh(1) forks a subshell for a
+# list, and that subshell waits for the server with a copy of the
+# SSH channel open, so the step never returns.
+#
+# regress/random.bin is the one fixed random source (TEST-ACCEPT-3),
+# and the harness puts it into the record directory of the fixed
+# instance, because the program unveils that directory and the key
+# file alone. The largest row of the draw table of TEST-ACCEPT-2 is
+# 64 bytes: the server entropy (32), the storage IV (16) and the
+# response IV (16). One request of the service is one process, and
+# the seam opens the file at the first draw of that process, so each
+# request reads the file from its first byte, and the upstream wrapper
+# rewinds the file before each request. A run therefore needs 64
+# bytes, and the file holds 256: four times the largest row, so a draw
+# beyond the table moves a later draw and fails the comparison, and it
+# stops no server. 'dd if=/dev/urandom of=regress/random.bin bs=64
+# count=4' wrote the file once. The bytes are test data, not a secret.
 #
 # The third part is the check. The harness puts
 # regress/interop-upstream.py into the guest and runs it there. The
 # header of that program names the tests of the upstream suite that
-# run against the stack, and the tests that do not. The harness copies
-# the report out with 'fuguvm get' into scratch/interop-report.txt
-# (TEST-INTEROP-7), it prints one TAP line for each test, and it exits
-# non-zero on any failure.
+# run against the stack, and the tests that do not. The harness then
+# puts regress/interop-checks.py and runs it: the junk uniformity, the
+# failure table, and the byte identity of the two fixed servers
+# (TEST-INTEROP-2, TEST-INTEROP-3, TEST-ACCEPT-1). The harness copies
+# each report out with 'fuguvm get' into scratch/ (TEST-INTEROP-7), it
+# prints one TAP line for each test, and it exits non-zero on any
+# failure.
 #
 # The guest runs nothing on the host, and the harness runs no shell
 # on the host: each host command is a list.
@@ -126,6 +164,9 @@ use Fugu::Process;
 my $ROOT   = dirname($RealBin);
 my $FUGUVM = $ENV{FUGUVM} // 'fuguvm';
 
+# The environment of each child (TEST-ACCEPT-3).
+my $CHILD_ENV = { %ENV, FUGUVM => $FUGUVM };
+
 # The snapshot of the provisioned guest.
 my $SNAPSHOT = 'provisioned';
 
@@ -138,6 +179,17 @@ my $WORK = '/home/fuguoracle/interop';
 my $PORT = 8080;
 my $URL  = "http://127.0.0.1:$PORT";
 
+# The endpoint of the fixed instance of the service, and the paths of
+# that instance inside the httpd chroot.
+my $FIXED_PORT = 8081;
+my $FIXED_URL  = "http://127.0.0.1:$FIXED_PORT";
+my $FIXED      = '/fuguoracle-fixed';
+my $RANDOM     = "$FIXED/pins/random.bin";
+
+# The endpoint of the upstream server on the fixed random file.
+my $UPSTREAM_PORT = 8082;
+my $UPSTREAM_URL  = "http://127.0.0.1:$UPSTREAM_PORT";
+
 # The tested upstream: the commit of blind_pin_server that the tests
 # of this harness passed against.
 my $UPSTREAM_COMMIT = '62b920ef50b8e035d26916d9ed77b42903664993';
@@ -148,8 +200,11 @@ my $UPSTREAM_COMMIT = '62b920ef50b8e035d26916d9ed77b42903664993';
 # and swig for the wrapper that the same tree removes.
 my $PACKAGES = 'python%3 py3-pip bash gmake swig';
 
-# The report of the check, on the host.
-my $REPORT = "$ROOT/scratch/interop-report.txt";
+# The reports of the two check programs, on the host.
+my %REPORT = (
+	upstream => "$ROOT/scratch/interop-upstream.txt",
+	checks   => "$ROOT/scratch/interop-checks.txt"
+);
 
 # The seconds of one host command, one guest command, the SSH wait,
 # one build, and the pip run. The wallycore build takes about nine
@@ -170,27 +225,62 @@ my %FUGUVM_EXIT = (
 );
 
 # The script of the service account and the two directories
-# (PKG-ORACLE-2, PKG-ORACLE-3). It creates what is absent, and it
-# keeps what is in place. useradd(8) runs pwd_mkdb(8) in the
-# background, so the script waits for the passwd entry.
-my $ACCOUNT = <<'SH';
+# (PKG-ORACLE-2, PKG-ORACLE-3), and of the same two directories of
+# the fixed instance. It creates what is absent, and it keeps what is
+# in place. useradd(8) runs pwd_mkdb(8) in the background, so the
+# script waits for the passwd entry.
+my $ACCOUNT = <<"SH";
 set -e
 user=_fuguoracle
-getent group $user > /dev/null 2>&1 || groupadd $user
-if ! getent passwd $user > /dev/null 2>&1; then
-	useradd -g $user -d /var/empty -s /sbin/nologin $user
+getent group \$user > /dev/null 2>&1 || groupadd \$user
+if ! getent passwd \$user > /dev/null 2>&1; then
+	useradd -g \$user -d /var/empty -s /sbin/nologin \$user
 	try=0
-	while ! getent passwd $user > /dev/null 2>&1; do
-		try=$((try + 1))
-		[ $try -lt 10 ] || exit 1
+	while ! getent passwd \$user > /dev/null 2>&1; do
+		try=\$((try + 1))
+		[ \$try -lt 10 ] || exit 1
 		sleep 1
 	done
 fi
-mkdir -p /var/www/fuguoracle/pins
-chown root:$user /var/www/fuguoracle
-chmod 0710 /var/www/fuguoracle
-chown $user:$user /var/www/fuguoracle/pins
-chmod 0700 /var/www/fuguoracle/pins
+for dir in /var/www/fuguoracle /var/www$FIXED; do
+	mkdir -p \$dir/pins
+	chown root:\$user \$dir
+	chmod 0710 \$dir
+	chown \$user:\$user \$dir/pins
+	chmod 0700 \$dir/pins
+done
+SH
+
+# The script of the test config, from the fragment at $WORK/httpd.conf.
+# plain() writes the fragment with a plain listen line on one port and
+# without the tls block. The second block drops the comment lines,
+# takes another name, names the second program, and appends the
+# FastCGI parameter of the fixed random file after each
+# SCRIPT_FILENAME line.
+my $HTTPD = <<"SH";
+set -e
+plain() {
+	sed -e "s/listen on egress tls port 443/listen on lo0 port \$1/" \\
+	    -e '/^[[:blank:]]tls {\$/,/^[[:blank:]]}\$/d' $WORK/httpd.conf
+}
+plain $PORT > /etc/httpd.conf
+plain $FIXED_PORT | sed -e '/^#/d' -e 's/^server .*/server "fixed" {/' \\
+    -e 's#/cgi-bin/fuguoracle"#/cgi-bin/fuguoracle-fixed"#' \\
+    -e '/param SCRIPT_FILENAME/a\\
+param FUGUORACLE_RANDOM "$RANDOM"' >> /etc/httpd.conf
+httpd -n
+SH
+
+# The script of the key: a fresh key of the service, a copy of it
+# for the fixed instance, and no record in either instance. The
+# public key is the one line of standard output.
+my $KEY = <<"SH";
+set -e
+rm -f /var/www/fuguoracle/pins/*.pin /var/www/fuguoracle/private.key
+rm -f /var/www$FIXED/pins/*.pin /var/www$FIXED/private.key
+fuguoracle-keygen
+install -o _fuguoracle -g _fuguoracle -m 0400 \\
+    /var/www/fuguoracle/private.key /var/www$FIXED/private.key
 SH
 
 # The make shim of the pip run. BSD make cannot run the automake tree
@@ -223,14 +313,28 @@ sub step ($what)
 	return;
 }
 
+# reach(@urls):
+#	The shell text that waits for each URL: ten tries, one second
+#	apart, and exit 1 when one URL answers nothing.
+sub reach (@urls)
+{
+	return join q{}, map {
+		      "try=0; until ftp -Vo /dev/null $_/; do "
+		    . "try=\$((try + 1)); [ \$try -lt 10 ] || exit 1; "
+		    . "sleep 1; done\n"
+	} @urls;
+}
+
 # host($cmd, %args):
-#	Run one host command from the repository root, and give the
-#	result hash of Fugu::Process->run().
+#	Run one host command from the repository root, with the
+#	environment of each child, and give the result hash of
+#	Fugu::Process->run().
 sub host ( $cmd, %args )
 {
 	return Fugu::Process->run(
 		cmd     => $cmd,
 		cwd     => $ROOT,
+		env     => $CHILD_ENV,
 		timeout => $TIMEOUT{host},
 		%args
 	);
@@ -321,7 +425,6 @@ sub provision ()
 	host_ok(
 		'regress/guest',
 		[ "$ROOT/regress/guest", $ENV{FUGUORACLE_SECP256K1} ],
-		env     => { %ENV, FUGUVM => $FUGUVM },
 		timeout => $TIMEOUT{build} );
 
 	step('the upstream checkout');
@@ -404,8 +507,9 @@ sub ready ()
 }
 
 # deploy():
-#	The stack in the guest, from the working tree. Gives the
-#	public key of the service, as hex.
+#	The stack in the guest, from the working tree: the service,
+#	the fixed instance of it, and the upstream server on the fixed
+#	random file. Gives the public key of the service, as hex.
 sub deploy ()
 {
 	step('the tree');
@@ -414,7 +518,12 @@ sub deploy ()
 	put( tracked($ROOT), "$WORK/src" );
 
 	step('the build');
-	guest_ok( 'the build', "cd $WORK/src && make", $TIMEOUT{build} );
+	guest_ok(
+		'the build',
+		"cd $WORK/src && make && make -C regress cgi "
+		    . "PINS_DIR=$FIXED/pins KEY_PATH=$FIXED/private.key",
+		$TIMEOUT{build}
+	);
 
 	step('the service account');
 	guest_ok( 'the service account', $ACCOUNT );
@@ -424,7 +533,9 @@ sub deploy ()
 		'the programs',
 		"cd $WORK/src && install -o root -g bin -m 0555 fuguoracle "
 		    . "/var/www/cgi-bin/fuguoracle && install -o root -g bin "
-		    . "-m 0555 fuguoracle-keygen /usr/local/sbin/fuguoracle-keygen"
+		    . "-m 0555 regress/cgi /var/www/cgi-bin/fuguoracle-fixed && "
+		    . "install -o root -g bin -m 0555 fuguoracle-keygen "
+		    . "/usr/local/sbin/fuguoracle-keygen"
 	);
 
 	step('the rc.d script');
@@ -434,77 +545,108 @@ sub deploy ()
 	step('the httpd.conf');
 	put( "$ROOT/ports/security/fuguoracle/files/httpd.conf",
 		"$WORK/httpd.conf" );
-	guest_ok(
-		'the httpd.conf',
-"sed -e 's/listen on egress tls port 443/listen on lo0 port $PORT/' "
-		    . "-e '/^[[:blank:]]tls {\$/,/^[[:blank:]]}\$/d' "
-		    . "$WORK/httpd.conf > /etc/httpd.conf && httpd -n"
-	);
+	guest_ok( 'the httpd.conf', $HTTPD );
 
 	step('the key');
-	my $key = guest_ok(
-		'the key',
-		"rm -f /var/www/fuguoracle/pins/*.pin "
-		    . "/var/www/fuguoracle/private.key && fuguoracle-keygen"
-	);
+	my $key = guest_ok( 'the key', $KEY );
 	chomp $key;
 	die "interop: the key: fuguoracle-keygen printed no public key: $key\n"
 	    unless $key =~ /\A[0-9a-f]{66}\z/;
 
+	step('the fixed random file');
+	put( "$ROOT/regress/random.bin", "/var/www$RANDOM", '--mode', '0444' );
+
 	step('the services');
 	guest_ok(
 		'the services',
-"rcctl enable httpd fuguoracle && rcctl restart fuguoracle httpd "
-		    . "&& for try in 1 2 3 4 5 6 7 8 9 10; do "
-		    . "ftp -Vo /dev/null $URL/ && exit 0; sleep 1; done; exit 1"
+		"set -e\nrcctl enable httpd fuguoracle\n"
+		    . "rcctl restart fuguoracle httpd\n"
+		    . reach( $URL, $FIXED_URL )
+	);
+
+	step('the upstream server on the fixed random file');
+	put( "$ROOT/regress/upstream-fixed.py", "$WORK/upstream-fixed.py" );
+	guest_ok(
+		'the upstream server',
+		"set -e\nrm -rf $WORK/fixed && mkdir -p $WORK/fixed/pins\n"
+		    . "install -m 0600 /var/www/fuguoracle/private.key "
+		    . "$WORK/fixed/server_private_key.key\n"
+		    . "cd $WORK/fixed\n"
+		    . "PYTHONPATH=$WORK nohup $WORK/venv/bin/python "
+		    . "$WORK/upstream-fixed.py /var/www$RANDOM $UPSTREAM_PORT "
+		    . "< /dev/null > $WORK/fixed/server.log 2>&1 &\n"
+		    . reach($UPSTREAM_URL)
 	);
 	return $key;
 }
 
+# report($what, $program, $report, $count):
+#	Run one unittest program in the run directory of the guest,
+#	copy its report to $report on the host (TEST-INTEROP-7), and
+#	print one TAP line for each test, numbered from $$count on.
+#	Gives the count of failed tests. A run that failed, or that
+#	ran no test, ends the harness with the report on standard
+#	error.
+sub report ( $what, $program, $report, $count )
+{
+	my $result =
+	    guest(    "cd $WORK/run && PYTHONPATH=$WORK TMPDIR=$WORK/tmp "
+		    . "$WORK/venv/bin/python $program "
+		    . "> $WORK/report.txt 2>&1" );
+	make_path( dirname($report) );
+	fuguvm_ok( 'fuguvm get', 'get', "$WORK/report.txt", $report );
+
+	open my $fh, '<', $report or die "interop: $report: $!\n";
+	my ( $tests, $failed ) = ( 0, 0 );
+	while ( my $line = <$fh> ) {
+		my ( $name, $verdict ) =
+		    $line =~ /\A(test_\w+) \(.*\) \.\.\. (ok|FAIL|ERROR)\s*\z/
+		    or next;
+		$tests++;
+		$$count++;
+		if ( $verdict eq 'ok' ) {
+			say "ok $$count - $name";
+		}
+		else {
+			$failed++;
+			say "not ok $$count - $name";
+		}
+	}
+	close $fh;
+
+	return $failed if $result->{success} && $tests;
+	open $fh, '<', $report or die "interop: $report: $!\n";
+	print STDERR <$fh>;
+	close $fh;
+	die failure( $what, $result ) if !$result->{success};
+	die "interop: $what ran no test\n";
+}
+
 # check($key):
-#	The upstream test suite against the stack, and the TAP lines
-#	of it. Gives the count of failed tests, and dies when the
-#	suite ran no test.
+#	The upstream test suite and the checks against the stack, and
+#	the TAP lines of both. Gives the count of failed tests.
 sub check ($key)
 {
+	my $count = 0;
+
 	step('the upstream test suite');
 	put( "$ROOT/regress/interop-upstream.py", "$WORK/interop-upstream.py" );
 	guest_ok(
 		'the run directory',
 "rm -f $WORK/run/pins && ln -s /var/www/fuguoracle/pins $WORK/run/pins"
 	);
-	my $result =
-	    guest(    "cd $WORK/run && PYTHONPATH=$WORK TMPDIR=$WORK/tmp "
-		    . "$WORK/venv/bin/python $WORK/interop-upstream.py $URL $key "
-		    . "> $WORK/report.txt 2>&1" );
-	make_path( dirname($REPORT) );
-	fuguvm_ok( 'fuguvm get', 'get', "$WORK/report.txt", $REPORT );
+	my $failed = report( 'the upstream test suite',
+		"$WORK/interop-upstream.py $URL $key",
+		$REPORT{upstream}, \$count );
 
-	open my $fh, '<', $REPORT or die "interop: $REPORT: $!\n";
-	my ( $count, $failed ) = ( 0, 0 );
-	while ( my $line = <$fh> ) {
-		my ( $name, $verdict ) =
-		    $line =~ /\A(test_\w+) \(.*\) \.\.\. (ok|FAIL|ERROR)\s*\z/
-		    or next;
-		$count++;
-		if ( $verdict eq 'ok' ) {
-			say "ok $count - $name";
-		}
-		else {
-			$failed++;
-			say "not ok $count - $name";
-		}
-	}
-	close $fh;
+	step('the checks');
+	put( "$ROOT/regress/interop-checks.py", "$WORK/interop-checks.py" );
+	$failed += report( 'the checks',
+		"$WORK/interop-checks.py $URL $FIXED_URL $UPSTREAM_URL $key",
+		$REPORT{checks}, \$count );
+
 	say "1..$count";
-
-	return $failed if $result->{success} && $count;
-	open $fh, '<', $REPORT or die "interop: $REPORT: $!\n";
-	print STDERR <$fh>;
-	close $fh;
-	die failure( 'the upstream test suite', $result )
-	    if !$result->{success};
-	die "interop: the upstream test suite ran no test\n";
+	return $failed;
 }
 
 for my $name (

@@ -28,7 +28,9 @@
 # this build names a record directory of the regress tree. The cgi
 # program reads a static key, so this build names a key file of the
 # regress tree as well. Each path stays a compile-time constant
-# (D-06).
+# (D-06). The interop harness builds cgi for a second instance inside
+# the httpd chroot, so PINS_DIR and KEY_PATH take a value from the
+# command line as well.
 #
 # cgi holds the source of the service program, and cgi.sh drives it
 # with the CGI variables in the environment (PROG-CGI-1). A bare run
@@ -54,8 +56,11 @@ SRCS_cgi=	main.c http.c oracle.c pindb.c cipher.c
 LOCALBASE?=	/usr/local
 
 CFLAGS+=	-Wall -Wextra -Werror -DREGRESS
-CFLAGS+=	-DPINS_DIR='"${.OBJDIR}/pins"'
-CFLAGS+=	-DKEY_PATH='"${.OBJDIR}/private.key"'
+PINS_DIR?=	${.OBJDIR}/pins
+KEY_PATH?=	${.OBJDIR}/private.key
+
+CFLAGS+=	-DPINS_DIR='"${PINS_DIR}"'
+CFLAGS+=	-DKEY_PATH='"${KEY_PATH}"'
 CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/.. -I${LOCALBASE}/include
 LDFLAGS+=	-static -L${LOCALBASE}/lib
 LDADD=		-lsecp256k1 -lcrypto

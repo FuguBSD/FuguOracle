@@ -146,7 +146,7 @@ envelope_bytes() {
 		my $body = do { local $/; <STDIN> };
 		$body = "" if !defined $body;
 		chomp $body;
-		print $body =~ m/^\{"data": "([A-Za-z0-9+\/=]+)"\}$/ ?
+		print $body =~ m/^\{"data":"([A-Za-z0-9+\/=]+)"\}$/ ?
 		    length(decode_base64($1)) : -1;
 	'
 }
