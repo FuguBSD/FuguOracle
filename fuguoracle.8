@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: September 20 2026 $
+.Dd $Mdocdate: September 24 2026 $
 .Dt FUGUORACLE 8
 .Os
 .Sh NAME
@@ -173,6 +173,14 @@ makes this file.
 .It Pa /fuguoracle/pins/
 The record directory.
 One flat file holds the record of one client.
+Any caller can create a record, and the protocol sets no limit on the
+count.
+The operator must monitor the free space of the filesystem that holds
+this directory.
+The operator can mount a dedicated filesystem on
+.Pa /var/www/fuguoracle ,
+so that a fill cannot starve the rest of
+.Pa /var/www .
 .El
 .Pp
 A program outside the chroot reads the same two paths as

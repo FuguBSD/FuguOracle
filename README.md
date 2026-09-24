@@ -14,7 +14,7 @@ second client.
 ## Commands
 
 ```sh
-make deps        # install gitleaks
+make deps        # install signify, gitleaks and the Fugu library
 make check       # run every gate; run it before each commit
 make test        # run the test suite
 make format-fix  # fix the Markdown, JSON and YAML formatting
