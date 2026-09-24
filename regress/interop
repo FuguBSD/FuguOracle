@@ -1,0 +1,526 @@
+#!/usr/bin/env perl
+# ex:ts=8 sw=4:
+#
+# Copyright (c) 2026 Dick Olsson <hi@senzilla.io>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# interop: run the upstream test suite against the stack in the guest.
+#
+# usage: make interop
+#
+# This program is the interop harness of TEST-INTEROP. It is no .t
+# file, and make check never runs it: it needs an OpenBSD guest, the
+# fuguvm tool, and a checkout of the upstream server. mk/local.mk
+# holds the interop target, and that target is the one caller.
+#
+# The harness runs on the host, on the Fugu library. It runs fuguvm
+# as a command only, with Fugu::Process and an argument list, and it
+# loads no App::FuguVM module (TEST-INTEROP-4). A guest step is one
+# 'fuguvm ssh -- sh -c <script>' call, so a step takes a redirect and
+# a pipe, and each step is one call (TEST-INTEROP-4). The harness
+# reads the exit code of each fuguvm call (TEST-INTEROP-5), and it
+# stops at the first failed step with the output of that step.
+#
+# The guest is the guest of the .fuguvmrc of this repository. That
+# file is local and untracked: it names a state directory of its own,
+# so this guest is apart from the guest of any other harness, and it
+# binds each forwarded port to the loopback address. The guest
+# permits a root login with a generated password, so the developer
+# runs the harness on a private host only (TEST-INTEROP-6).
+#
+# A run has three parts. The first part brings the provisioned guest
+# up: 'fuguvm snapshot restore provisioned', then 'fuguvm up', then
+# 'fuguvm wait'. Exit code 5 of the restore reports a running guest,
+# and the harness stops the guest and restores again. Exit code 11
+# reports no snapshot: the harness then destroys the disk, installs
+# the guest again with 'fuguvm up', provisions it, stops it, and
+# saves the snapshot (TEST-INTEROP-5). Exit code 7 of the wait
+# reports a timeout. The provisioning holds, one call for each step:
+# the packages, then regress/guest for the library, the programs and
+# the regression tests, then the upstream checkout and the Python
+# distributions by 'fuguvm put', then a venv, then the pip run, then
+# an import of wallycore, flask and requests. A change of one of these
+# steps needs a new snapshot: run 'fuguvm snapshot rm provisioned'.
+#
+# The second part deploys the tree. The harness puts the tracked files
+# of the working tree into the guest with 'fuguvm put', and the guest
+# builds them (ARCH-DEPS-5). One step creates the service account and
+# the two directories of PKG-ORACLE-2 and PKG-ORACLE-3. One step
+# installs the CGI program into the httpd chroot and the key
+# generator into /usr/local/sbin. The harness puts the rc.d script
+# and the httpd.conf fragment of ports/security/fuguoracle in the
+# same way (TEST-INTEROP-7). The test config differs from the
+# fragment in the listen line alone: a sed of the guest puts
+# 'listen on lo0 port 8080' in place of the TLS listen line, and it
+# removes the tls block, because the test needs no certificate.
+# fuguoracle-keygen then makes a fresh key, and rcctl starts httpd and
+# the fuguoracle service.
+#
+# The third part is the check. The harness puts
+# regress/interop-upstream.py into the guest and runs it there. The
+# header of that program names the tests of the upstream suite that
+# run against the stack, and the tests that do not. The harness copies
+# the report out with 'fuguvm get' into scratch/interop-report.txt
+# (TEST-INTEROP-7), it prints one TAP line for each test, and it exits
+# non-zero on any failure.
+#
+# The guest runs nothing on the host, and the harness runs no shell
+# on the host: each host command is a list.
+#
+# These are the environment variables:
+#
+#	FUGUVM	The fuguvm command. The default is fuguvm of the
+#		PATH. fuguvm needs the modules of FuguVM and the
+#		agent socket of the guest, so the caller sets
+#		PERL5LIB and SSH_AUTH_SOCK for it.
+#
+#	FUGUORACLE_SECP256K1
+#		The libsecp256k1 release tarball. regress/guest takes
+#		it, and its header states the source of it.
+#
+#	FUGUORACLE_BLIND_PIN_SERVER
+#		The directory of a git checkout of the upstream
+#		blind_pin_server. The harness puts the tracked files
+#		of that checkout into the guest as the package
+#		blind_pin_server, so the venv and the keys of the
+#		checkout stay on the host. The tested upstream is
+#		the commit that $UPSTREAM_COMMIT holds below, and the
+#		harness warns when HEAD of the checkout differs.
+#
+#	FUGUORACLE_PYPI
+#		The directory of the Python distributions that the
+#		requirements file of the checkout pins: one wheel or
+#		one source archive for each pin. regress/pypi-fetch
+#		builds that directory from the requirements file. The
+#		guest reaches no package index, so pip reads this
+#		directory alone.
+#
+# The location of a checkout of a third-party server, and of a set of
+# third-party distributions, is no design fact of FuguOracle, so no
+# document of spec/ names these variables.
+
+use v5.34;
+use warnings;
+use experimental 'signatures';
+no feature qw(indirect multidimensional bareword_filehandles);
+
+use File::Basename qw(dirname);
+use File::Copy     qw(copy);
+use File::Path     qw(make_path);
+use File::Temp     ();
+use FindBin        qw($RealBin);
+
+use Fugu::Process;
+
+my $ROOT   = dirname($RealBin);
+my $FUGUVM = $ENV{FUGUVM} // 'fuguvm';
+
+# The snapshot of the provisioned guest.
+my $SNAPSHOT = 'provisioned';
+
+# The work directory of the guest. It sits on /home, because the root
+# partition of the guest holds a few hundred megabytes only. It is
+# apart from the directory of regress/guest.
+my $WORK = '/home/fuguoracle/interop';
+
+# The public endpoint of the stack in the guest, without TLS.
+my $PORT = 8080;
+my $URL  = "http://127.0.0.1:$PORT";
+
+# The tested upstream: the commit of blind_pin_server that the tests
+# of this harness passed against.
+my $UPSTREAM_COMMIT = '62b920ef50b8e035d26916d9ed77b42903664993';
+
+# The packages of the provisioning, beside the autotools that
+# regress/guest installs. The pip run builds wallycore from source: it
+# needs gmake for the automake tree, bash for a script of that tree,
+# and swig for the wrapper that the same tree removes.
+my $PACKAGES = 'python%3 py3-pip bash gmake swig';
+
+# The report of the check, on the host.
+my $REPORT = "$ROOT/scratch/interop-report.txt";
+
+# The seconds of one host command, one guest command, the SSH wait,
+# one build, and the pip run. The wallycore build takes about nine
+# minutes.
+my %TIMEOUT = (
+	host  => 120,
+	guest => 900,
+	wait  => 300,
+	build => 1800,
+	pip   => 2400
+);
+
+# The exit codes of fuguvm that the harness reads (TEST-INTEROP-5).
+my %FUGUVM_EXIT = (
+	5  => 'the guest runs',
+	7  => 'a timeout',
+	11 => 'no snapshot'
+);
+
+# The script of the service account and the two directories
+# (PKG-ORACLE-2, PKG-ORACLE-3). It creates what is absent, and it
+# keeps what is in place. useradd(8) runs pwd_mkdb(8) in the
+# background, so the script waits for the passwd entry.
+my $ACCOUNT = <<'SH';
+set -e
+user=_fuguoracle
+getent group $user > /dev/null 2>&1 || groupadd $user
+if ! getent passwd $user > /dev/null 2>&1; then
+	useradd -g $user -d /var/empty -s /sbin/nologin $user
+	try=0
+	while ! getent passwd $user > /dev/null 2>&1; do
+		try=$((try + 1))
+		[ $try -lt 10 ] || exit 1
+		sleep 1
+	done
+fi
+mkdir -p /var/www/fuguoracle/pins
+chown root:$user /var/www/fuguoracle
+chmod 0710 /var/www/fuguoracle
+chown $user:$user /var/www/fuguoracle/pins
+chmod 0700 /var/www/fuguoracle/pins
+SH
+
+# The make shim of the pip run. BSD make cannot run the automake tree
+# of wallycore, and the build reads make and python from the PATH, so
+# the pip step puts the shim directory and the venv on the PATH.
+my $SHIM = "#!/bin/sh\nexec /usr/local/bin/gmake \"\$@\"\n";
+
+# failure($what, $result):
+#	The message of one failed command: the reason, and the two
+#	streams of the command.
+sub failure ( $what, $result )
+{
+	my $code   = $result->{exit_code} // -1;
+	my $reason = $result->{error}     // (
+		$result->{timed_out}
+		? "no answer in the timeout"
+		: "exit $code"
+		    . ( $FUGUVM_EXIT{$code} ? ", $FUGUVM_EXIT{$code}" : q{} ) );
+	return
+	      "interop: $what: $reason\n"
+	    . ( $result->{stdout} // q{} )
+	    . ( $result->{stderr} // q{} );
+}
+
+# step($what):
+#	One progress line, as a TAP comment.
+sub step ($what)
+{
+	say "# $what";
+	return;
+}
+
+# host($cmd, %args):
+#	Run one host command from the repository root, and give the
+#	result hash of Fugu::Process->run().
+sub host ( $cmd, %args )
+{
+	return Fugu::Process->run(
+		cmd     => $cmd,
+		cwd     => $ROOT,
+		timeout => $TIMEOUT{host},
+		%args
+	);
+}
+
+# host_ok($what, $cmd, %args):
+#	Run one host command, and give its standard output. A failure
+#	ends the run.
+sub host_ok ( $what, $cmd, %args )
+{
+	my $result = host( $cmd, %args );
+	die failure( $what, $result ) unless $result->{success};
+	return $result->{stdout};
+}
+
+# fuguvm(@args):
+#	Run fuguvm with @args, and give the result hash.
+sub fuguvm (@args)
+{
+	return host( [ $FUGUVM, @args ], timeout => $TIMEOUT{guest} );
+}
+
+# fuguvm_ok($what, @args):
+#	Run fuguvm with @args. A failure ends the run.
+sub fuguvm_ok ( $what, @args )
+{
+	return host_ok( $what, [ $FUGUVM, @args ], timeout => $TIMEOUT{guest} );
+}
+
+# guest($script, $timeout):
+#	Run one shell script in the guest, and give the result hash.
+sub guest ( $script, $timeout = $TIMEOUT{guest} )
+{
+	return host( [ $FUGUVM, 'ssh', '--', 'sh', '-c', $script ],
+		timeout => $timeout );
+}
+
+# guest_ok($what, $script, $timeout):
+#	Run one shell script in the guest, and give its standard
+#	output. A failure ends the run.
+sub guest_ok ( $what, $script, $timeout = $TIMEOUT{guest} )
+{
+	my $result = guest( $script, $timeout );
+	die failure( $what, $result ) unless $result->{success};
+	return $result->{stdout};
+}
+
+# put($local, $remote, @flags):
+#	Copy one host file or directory into the guest.
+sub put ( $local, $remote, @flags )
+{
+	fuguvm_ok( "fuguvm put $remote", 'put', @flags, "$local", $remote );
+	return;
+}
+
+# tracked($dir):
+#	A temporary directory with a copy of the tracked files of the
+#	git working tree at $dir, with the mode of each file. The copy
+#	holds no ignored file and no untracked file, so 'fuguvm put'
+#	of it carries no venv, no key and no git metadata.
+sub tracked ($dir)
+{
+	my $stage = File::Temp->newdir(
+		TEMPLATE => 'fuguoracle-tree-XXXXXX',
+		TMPDIR   => 1
+	);
+	my $list = host_ok( "git ls-files of $dir",
+		[ 'git', '-C', $dir, 'ls-files', '-z' ] );
+	for my $file ( grep { length } split /\0/, $list ) {
+		my $from = "$dir/$file";
+		my $to   = "$stage/$file";
+		make_path( dirname($to) );
+		copy( $from, $to ) or die "interop: $from: $!\n";
+		chmod( ( stat $from )[2] & 0777, $to )
+		    or die "interop: $to: $!\n";
+	}
+	return $stage;
+}
+
+# provision():
+#	The steps of a fresh guest, up to the snapshot.
+sub provision ()
+{
+	step('the packages');
+	guest_ok( 'the packages', "pkg_add -I $PACKAGES", $TIMEOUT{build} );
+
+	step('the library, the programs and the regression tests');
+	host_ok(
+		'regress/guest',
+		[ "$ROOT/regress/guest", $ENV{FUGUORACLE_SECP256K1} ],
+		env     => { %ENV, FUGUVM => $FUGUVM },
+		timeout => $TIMEOUT{build} );
+
+	step('the upstream checkout');
+	my $upstream = $ENV{FUGUORACLE_BLIND_PIN_SERVER};
+	my $head     = host_ok( 'git rev-parse',
+		[ 'git', '-C', $upstream, 'rev-parse', 'HEAD' ] );
+	chomp $head;
+	warn "interop: $upstream is at $head, and the tested upstream "
+	    . "is $UPSTREAM_COMMIT\n"
+	    if $head ne $UPSTREAM_COMMIT;
+	guest_ok(
+		'the work directory',
+		"rm -rf $WORK && mkdir -p $WORK/blind_pin_server "
+		    . "$WORK/dist $WORK/bin $WORK/tmp $WORK/run"
+	);
+	put( tracked($upstream), "$WORK/blind_pin_server" );
+
+	step('the Python distributions');
+	put( $ENV{FUGUORACLE_PYPI}, "$WORK/dist" );
+
+	step('the venv');
+	my $shim = File::Temp->new(
+		TEMPLATE => 'fuguoracle-make-XXXXXX',
+		TMPDIR   => 1
+	);
+	print {$shim} $SHIM or die "interop: the shim: $!\n";
+	close $shim         or die "interop: the shim: $!\n";
+	put( "$shim", "$WORK/bin/make", '--mode', '0755' );
+	guest_ok( 'the venv',
+		"cd $WORK && rm -rf venv && python3 -m venv venv" );
+
+	step('the pip run');
+	guest_ok(
+		'the pip run',
+"cd $WORK && PATH=$WORK/bin:$WORK/venv/bin:\$PATH TMPDIR=$WORK/tmp "
+		    . "AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16 "
+		    . "venv/bin/pip install --no-index --find-links $WORK/dist "
+		    . "--require-hashes -r blind_pin_server/requirements.txt",
+		$TIMEOUT{pip} );
+
+	step('the import');
+	guest_ok(
+		'the import',
+		"$WORK/venv/bin/python -c 'import wallycore, flask, requests'"
+	);
+	return;
+}
+
+# ready():
+#	The provisioned guest, up and reachable. The snapshot gives
+#	it, and a fresh guest gets provisioned and saved first
+#	(TEST-INTEROP-5).
+sub ready ()
+{
+	step("the snapshot $SNAPSHOT");
+	my $result = fuguvm( 'snapshot', 'restore', $SNAPSHOT );
+	if ( ( $result->{exit_code} // -1 ) == 5 ) {
+		fuguvm_ok( 'fuguvm down', 'down' );
+		$result = fuguvm( 'snapshot', 'restore', $SNAPSHOT );
+	}
+	if ( !$result->{success} ) {
+		die failure( 'fuguvm snapshot restore', $result )
+		    unless ( $result->{exit_code} // -1 ) == 11;
+
+		step('the guest, installed again');
+		fuguvm_ok( 'fuguvm down',    'down' );
+		fuguvm_ok( 'fuguvm destroy', 'destroy' );
+		fuguvm_ok( 'fuguvm up',      'up' );
+		fuguvm_ok( 'fuguvm wait', 'wait', '--timeout', $TIMEOUT{wait} );
+		provision();
+		fuguvm_ok( 'fuguvm down', 'down' );
+		fuguvm_ok( 'fuguvm snapshot save',
+			'snapshot', 'save', $SNAPSHOT );
+	}
+
+	step('the guest');
+	fuguvm_ok( 'fuguvm up', 'up' );
+	fuguvm_ok( 'fuguvm wait', 'wait', '--timeout', $TIMEOUT{wait} );
+	return;
+}
+
+# deploy():
+#	The stack in the guest, from the working tree. Gives the
+#	public key of the service, as hex.
+sub deploy ()
+{
+	step('the tree');
+	guest_ok( 'the source directory',
+		"rm -rf $WORK/src && mkdir -p $WORK/src $WORK/run" );
+	put( tracked($ROOT), "$WORK/src" );
+
+	step('the build');
+	guest_ok( 'the build', "cd $WORK/src && make", $TIMEOUT{build} );
+
+	step('the service account');
+	guest_ok( 'the service account', $ACCOUNT );
+
+	step('the programs');
+	guest_ok(
+		'the programs',
+		"cd $WORK/src && install -o root -g bin -m 0555 fuguoracle "
+		    . "/var/www/cgi-bin/fuguoracle && install -o root -g bin "
+		    . "-m 0555 fuguoracle-keygen /usr/local/sbin/fuguoracle-keygen"
+	);
+
+	step('the rc.d script');
+	put( "$ROOT/ports/security/fuguoracle/pkg/fuguoracle.rc",
+		'/etc/rc.d/fuguoracle', '--mode', '0555' );
+
+	step('the httpd.conf');
+	put( "$ROOT/ports/security/fuguoracle/files/httpd.conf",
+		"$WORK/httpd.conf" );
+	guest_ok(
+		'the httpd.conf',
+"sed -e 's/listen on egress tls port 443/listen on lo0 port $PORT/' "
+		    . "-e '/^[[:blank:]]tls {\$/,/^[[:blank:]]}\$/d' "
+		    . "$WORK/httpd.conf > /etc/httpd.conf && httpd -n"
+	);
+
+	step('the key');
+	my $key = guest_ok(
+		'the key',
+		"rm -f /var/www/fuguoracle/pins/*.pin "
+		    . "/var/www/fuguoracle/private.key && fuguoracle-keygen"
+	);
+	chomp $key;
+	die "interop: the key: fuguoracle-keygen printed no public key: $key\n"
+	    unless $key =~ /\A[0-9a-f]{66}\z/;
+
+	step('the services');
+	guest_ok(
+		'the services',
+"rcctl enable httpd fuguoracle && rcctl restart fuguoracle httpd "
+		    . "&& for try in 1 2 3 4 5 6 7 8 9 10; do "
+		    . "ftp -Vo /dev/null $URL/ && exit 0; sleep 1; done; exit 1"
+	);
+	return $key;
+}
+
+# check($key):
+#	The upstream test suite against the stack, and the TAP lines
+#	of it. Gives the count of failed tests, and dies when the
+#	suite ran no test.
+sub check ($key)
+{
+	step('the upstream test suite');
+	put( "$ROOT/regress/interop-upstream.py", "$WORK/interop-upstream.py" );
+	guest_ok(
+		'the run directory',
+"rm -f $WORK/run/pins && ln -s /var/www/fuguoracle/pins $WORK/run/pins"
+	);
+	my $result =
+	    guest(    "cd $WORK/run && PYTHONPATH=$WORK TMPDIR=$WORK/tmp "
+		    . "$WORK/venv/bin/python $WORK/interop-upstream.py $URL $key "
+		    . "> $WORK/report.txt 2>&1" );
+	make_path( dirname($REPORT) );
+	fuguvm_ok( 'fuguvm get', 'get', "$WORK/report.txt", $REPORT );
+
+	open my $fh, '<', $REPORT or die "interop: $REPORT: $!\n";
+	my ( $count, $failed ) = ( 0, 0 );
+	while ( my $line = <$fh> ) {
+		my ( $name, $verdict ) =
+		    $line =~ /\A(test_\w+) \(.*\) \.\.\. (ok|FAIL|ERROR)\s*\z/
+		    or next;
+		$count++;
+		if ( $verdict eq 'ok' ) {
+			say "ok $count - $name";
+		}
+		else {
+			$failed++;
+			say "not ok $count - $name";
+		}
+	}
+	close $fh;
+	say "1..$count";
+
+	return $failed if $result->{success} && $count;
+	open $fh, '<', $REPORT or die "interop: $REPORT: $!\n";
+	print STDERR <$fh>;
+	close $fh;
+	die failure( 'the upstream test suite', $result )
+	    if !$result->{success};
+	die "interop: the upstream test suite ran no test\n";
+}
+
+for my $name (
+	qw(FUGUORACLE_SECP256K1 FUGUORACLE_BLIND_PIN_SERVER FUGUORACLE_PYPI))
+{
+	die "interop: $name is not set; the header of regress/interop "
+	    . "states each variable\n"
+	    unless defined $ENV{$name} && length $ENV{$name};
+}
+die "interop: $ENV{FUGUORACLE_SECP256K1}: no such file\n"
+    unless -f $ENV{FUGUORACLE_SECP256K1};
+die "interop: $ENV{FUGUORACLE_BLIND_PIN_SERVER}: no such directory\n"
+    unless -d $ENV{FUGUORACLE_BLIND_PIN_SERVER};
+die "interop: $ENV{FUGUORACLE_PYPI}: no such directory\n"
+    unless -d $ENV{FUGUORACLE_PYPI};
+
+ready();
+my $failed = check( deploy() );
+exit( $failed ? 1 : 0 );

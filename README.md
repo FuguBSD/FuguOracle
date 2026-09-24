@@ -17,5 +17,6 @@ second client.
 make deps        # install signify, gitleaks and the Fugu library
 make check       # run every gate; run it before each commit
 make test        # run the test suite
+make interop     # run the interop harness against the OpenBSD guest
 make format-fix  # fix the Markdown, JSON and YAML formatting
 ```
