@@ -1,4 +1,17 @@
-# External dependencies of FuguOracle. scripts/deps installs each line.
+# External dependencies of FuguOracle. scripts/fugubench deps installs
+# each line.
+
+# The runtime dist entry takes the signify tier, and the deps verb
+# needs signify(1) to check that signature. The tool environment
+# installs before every other one, so the command is there when the
+# runtime chain reaches the entry.
+tool pkg signify-openbsd
+
 # The secret gate of make check runs gitleaks, so the tool environment
 # installs it before every other environment.
 tool bin gitleaks https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_{os}_{arch}.tar.gz gitleaks
+
+# The interop harness of TEST-INTEROP drives fuguvm with Fugu::Process
+# (TEST-INTEROP-4), so the host needs the dist at run time. The
+# harness runs on the host only, and no port takes it.
+runtime dist https://github.com/FuguBSD/Fugu/releases/latest/download/Fugu.tar.gz

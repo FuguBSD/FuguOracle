@@ -8,11 +8,11 @@ unless the text says otherwise. `‖` marks concatenation.
 
 ## HTTP surface
 
-| Method | Path       | Body                   | Success response              |
-| ------ | ---------- | ---------------------- | ----------------------------- |
-| `GET`  | `/`        | —                      | `200`, empty body (liveness)  |
-| `POST` | `/get_pin` | `{"data": "<base64>"}` | `200`, `{"data": "<base64>"}` |
-| `POST` | `/set_pin` | `{"data": "<base64>"}` | `200`, `{"data": "<base64>"}` |
+| Method | Path       | Body                   | Success response             |
+| ------ | ---------- | ---------------------- | ---------------------------- |
+| `GET`  | `/`        | —                      | `200`, empty body (liveness) |
+| `POST` | `/get_pin` | `{"data": "<base64>"}` | `200`, `{"data":"<base64>"}` |
+| `POST` | `/set_pin` | `{"data": "<base64>"}` | `200`, `{"data":"<base64>"}` |
 
 A client builds the two POST paths when it appends `/get_pin` and `/set_pin` to
 the provisioned URL (see [CLIENT-PROVISION](clients.md#client-provision)).
@@ -225,4 +225,6 @@ the PIN record (see [STORE-KEYS](storage.md#store-keys)).
   [PROTO-ENCRYPT](protocol.md#proto-encrypt) with the response label. The
   enveloped size is exactly `16 + 48 + 32 = 96` bytes.
 - **PROTO-RESPONSE-3** — The service must encode the envelope as base64 and must
-  return it as `{"data": "<base64>"}`.
+  return it as `{"data":"<base64>"}`. One newline must follow the closing brace.
+  These are the bytes of the upstream server, so the acceptance compares the two
+  bodies byte for byte (see D-12).

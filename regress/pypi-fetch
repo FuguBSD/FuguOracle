@@ -1,0 +1,167 @@
+#!/usr/bin/env perl
+# ex:ts=8 sw=4:
+#
+# Copyright (c) 2026 Dick Olsson <hi@senzilla.io>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# pypi-fetch: fetch the pinned distributions of a requirements file.
+#
+# usage: pypi-fetch <requirements.txt> <output directory>
+#
+# The interop harness regress/interop installs the upstream test
+# suite in the OpenBSD guest, and the guest reaches no package index.
+# This tool builds the directory that the harness gives to pip: one
+# file for each pin of the requirements file. FUGUORACLE_PYPI names
+# that directory, and the harness header states the use of it.
+#
+# The requirements file holds one 'name==version' line for each
+# package, and one or more '--hash=sha256:' pins after it. For each
+# package the tool reads the release record of the index at
+# https://pypi.org/pypi/<name>/<version>/json. It picks the wheel of
+# the tag py3-none-any, or of the tag py2.py3-none-any, when the
+# digest of that wheel matches a pin. Without such a wheel, it picks
+# the source archive, when the digest of that archive matches a pin.
+# A package with no such file is a failure.
+#
+# curl fetches each record and each file, as a command. Digest::SHA
+# reads the downloaded file, and a file whose digest matches no pin
+# never keeps its name. A file that the directory holds with a
+# matching digest stays, and the tool fetches it again only when the
+# digest differs. The tool prints nothing on success.
+
+use v5.34;
+use warnings;
+use experimental 'signatures';
+no feature qw(indirect multidimensional bareword_filehandles);
+
+use Digest::SHA ();
+use JSON::PP    ();
+
+my $INDEX = 'https://pypi.org/pypi';
+
+# The tags of a pure wheel. A wheel of one of these tags runs on
+# every platform and every interpreter of the major version.
+my $PURE = qr/-(?:py3|py2\.py3)-none-any\.whl\z/;
+
+# usage():
+#	The usage line on standard error, and exit status 1.
+sub usage ()
+{
+	say STDERR 'usage: pypi-fetch <requirements.txt> <output directory>';
+	exit 1;
+}
+
+# pins($path):
+#	The pins of one requirements file, in file order. Each pin
+#	holds the name, the version and the set of digests. A line
+#	that ends in a backslash continues on the next line.
+sub pins ($path)
+{
+	open my $fh, '<', $path or die "pypi-fetch: $path: $!\n";
+	local $/ = undef;
+	my $text = <$fh>;
+	close $fh;
+	$text =~ s/\\\n//g;
+
+	my @pins;
+	for my $line ( split /\n/, $text ) {
+		$line =~ s/#.*//;
+		next if $line !~ /\S/;
+		my ( $name, $version, $rest ) =
+		    $line =~ /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)==(\S+)\s*(.*)$/
+		    or die "pypi-fetch: $path: a line holds no pin: $line\n";
+		my %digest =
+		    map { $_ => 1 } $rest =~ /--hash=sha256:([0-9a-f]{64})/g;
+		die "pypi-fetch: $path: $name==$version holds no sha256 pin\n"
+		    unless %digest;
+		push @pins,
+		    { name => $name, version => $version, digest => \%digest };
+	}
+	return @pins;
+}
+
+# fetch($url, @args):
+#	Run curl for one URL, with @args before it. Standard error of
+#	curl reaches the caller of this tool.
+sub fetch ( $url, @args )
+{
+	my $status = system( 'curl', '-sS', '-f', '-L', @args, $url );
+	die "pypi-fetch: $url: curl exited " . ( $status >> 8 ) . "\n"
+	    if $status != 0;
+	return;
+}
+
+# release($pin):
+#	The release record of one pin, as the index gives it.
+sub release ($pin)
+{
+	my $url = "$INDEX/$pin->{name}/$pin->{version}/json";
+	open my $fh, '-|', 'curl', '-sS', '-f', '-L', $url
+	    or die "pypi-fetch: curl: $!\n";
+	local $/ = undef;
+	my $json = <$fh>;
+	close $fh or die "pypi-fetch: $url: curl exited " . ( $? >> 8 ) . "\n";
+	return JSON::PP->new->decode($json);
+}
+
+# choose($pin, $release):
+#	The file of the release that the pin admits: a pure wheel
+#	first, and the source archive after it.
+sub choose ( $pin, $release )
+{
+	my @files = @{ $release->{urls} // [] };
+	my @pinned =
+	    grep { $pin->{digest}{ $_->{digests}{sha256} // q{} } } @files;
+	for my $file (@pinned) {
+		return $file
+		    if $file->{packagetype} eq 'bdist_wheel'
+		    && $file->{filename} =~ $PURE;
+	}
+	for my $file (@pinned) {
+		return $file if $file->{packagetype} eq 'sdist';
+	}
+	die "pypi-fetch: $pin->{name}==$pin->{version}: no pure wheel and "
+	    . "no source archive of the index matches a pin\n";
+}
+
+# digest($path):
+#	The sha256 of one file, as hex.
+sub digest ($path)
+{
+	return Digest::SHA->new(256)->addfile($path)->hexdigest;
+}
+
+usage() if @ARGV != 2;
+my ( $requirements, $out ) = @ARGV;
+usage() unless -f $requirements;
+if ( !-d $out ) {
+	mkdir $out or die "pypi-fetch: $out: $!\n";
+}
+
+for my $pin ( pins($requirements) ) {
+	my $file = choose( $pin, release($pin) );
+	my $want = $file->{digests}{sha256};
+	my $path = "$out/$file->{filename}";
+	next if -f $path && digest($path) eq $want;
+
+	my $part = "$path.part";
+	fetch( $file->{url}, '-o', $part );
+	my $got = digest($part);
+	if ( $got ne $want ) {
+		unlink $part;
+		die "pypi-fetch: $file->{filename}: the digest $got matches "
+		    . "no pin\n";
+	}
+	rename $part, $path or die "pypi-fetch: $path: $!\n";
+}

@@ -349,7 +349,14 @@ http_respond_data(const uint8_t *env, size_t env_len)
 		return -1;
 	if (header(HTTP_STATUS_OK, "application/json") != 0)
 		return -1;
-	if (printf("{\"data\": \"%s\"}", b64) < 0)
+
+	/*
+	 * The framing is the framing of the upstream server: no space
+	 * after the colon, and one newline after the closing brace, so
+	 * the acceptance compares the two bodies byte for byte
+	 * (PROTO-RESPONSE-3, D-12).
+	 */
+	if (printf("{\"data\":\"%s\"}\n", b64) < 0)
 		return -1;
 	return flush();
 }

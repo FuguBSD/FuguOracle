@@ -1,0 +1,18 @@
+#!/bin/ksh
+#
+# $OpenBSD$
+#
+# The slowcgi(8) instance of fuguoracle (DEPLOY-SERVICE-1). It runs
+# inside the /var/www chroot, it listens on a dedicated socket, and it
+# runs the CGI program as the user _fuguoracle (SEC-SANDBOX-4). The
+# base slowcgi service keeps its own socket and its own user, so the
+# two instances run side by side.
+
+daemon="/usr/sbin/slowcgi"
+daemon_flags="-p /var/www -s /var/www/run/fuguoracle.sock -u _fuguoracle"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+rc_cmd $1
