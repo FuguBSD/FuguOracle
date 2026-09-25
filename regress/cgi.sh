@@ -139,14 +139,14 @@ head_of() {
 }
 
 # envelope_bytes():
-#	The bytes of the response envelope of the answer. A body of
+#	The bytes of the response envelope of the answer. One newline
+#	follows the closing brace, and no other byte. A body of
 #	another shape answers -1 (PROTO-RESPONSE-3).
 envelope_bytes() {
 	sed -e '1,/^$/d' "$work/text" | perl -MMIME::Base64 -e '
 		my $body = do { local $/; <STDIN> };
 		$body = "" if !defined $body;
-		chomp $body;
-		print $body =~ m/^\{"data":"([A-Za-z0-9+\/=]+)"\}$/ ?
+		print $body =~ m/\A\{"data":"([A-Za-z0-9+\/=]+)"\}\n\z/ ?
 		    length(decode_base64($1)) : -1;
 	'
 }
