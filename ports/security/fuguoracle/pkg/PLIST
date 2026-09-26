@@ -1,5 +1,5 @@
-@newgroup _fuguoracle:902
-@newuser _fuguoracle:902:_fuguoracle::FuguOracle service:/var/empty:/sbin/nologin
+@newgroup _fuguoracle:906
+@newuser _fuguoracle:906:_fuguoracle::FuguOracle service:/var/empty:/sbin/nologin
 @rcscript ${RCDIR}/fuguoracle
 @man man/man8/fuguoracle-keygen.8
 @man man/man8/fuguoracle.8

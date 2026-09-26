@@ -2,6 +2,7 @@ COMMENT =	blind PIN oracle and virtual secure element (pinserver v2)
 
 GH_ACCOUNT =	FuguBSD
 GH_PROJECT =	FuguOracle
+# The pin lags the page: v0.1.0 lacks BACKUP and CLIENT PROVISIONING.
 GH_TAGNAME =	v0.1.0
 PKGNAME =	${DISTNAME:L}
 

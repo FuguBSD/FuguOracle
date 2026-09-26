@@ -102,7 +102,8 @@ by that path.
   time (see the [risks](overview.md#ovw-risks)).
 - **DEPLOY-BACKUP-5** — Key rotation in place is not supported: every storage
   key derives from the static key, so a new key orphans every record. On a
-  suspected key compromise, the operator must generate a new key and must clear
-  `pins/`. The operator must then provision the new public key into every
-  client, and must have every client run `set_pin` again. The man page and the
-  pkg-readme must carry this procedure.
+  suspected key compromise, the operator must stop the service, must remove the
+  key file, and must clear `pins/`. The operator must then generate a new key,
+  and must start the service. The operator must then provision the new public
+  key into every client, and must have every client run `set_pin` again. The man
+  page and the pkg-readme must carry this procedure.

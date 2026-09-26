@@ -181,10 +181,13 @@ A key rotation in place is not supported.
 Every storage key derives from the static key, so a new key orphans
 every record.
 On a suspected key compromise, the operator must stop the service,
-must generate a new key with
-.Xr fuguoracle-keygen 8 ,
-and must clear
+and must clear the key and the records:
+.Pa /var/www/fuguoracle/private.key ,
+and the content of
 .Pa pins/ .
+The operator must then make a new key with
+.Xr fuguoracle-keygen 8 ,
+and must start the service.
 The operator must then provision the new public key into every client,
 and every client must run
 .Li set_pin
