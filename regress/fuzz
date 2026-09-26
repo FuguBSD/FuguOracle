@@ -31,8 +31,13 @@
 # The FuguOracle side is the regress build of regress/Makefile, the
 # program cgi of <object directory>. The two compile-time paths of
 # that build, the record directory pins and the key file private.key,
-# sit in the same directory (D-06). The fuzzer runs the program for
-# each request, with Fugu::Process->run and a timeout (TEST-FUZZ-3).
+# sit in the same directory (D-06). The deploy of regress/interop
+# builds that program with the two paths of the fixed instance
+# instead (PINS_DIR and KEY_PATH). A plain 'make -C regress cgi'
+# rebuilds nothing after that deploy. The fuzzer therefore needs a
+# clean rebuild without the two overrides: 'make -C regress clean
+# cgi'. The fuzzer runs the program for each request, with
+# Fugu::Process->run and a timeout (TEST-FUZZ-3).
 # The request variables of PROG-CGI-1 and PROG-CGI-2 sit in the
 # environment of the child, and the body on standard input
 # (TEST-FUZZ-4). The seam of the regress build reads each draw from
@@ -69,7 +74,9 @@
 # source. The fuzzer therefore decrypts nothing. Each other 200 body
 # is junk. The fuzzer proves that premise first. The unmutated
 # request must answer one identical 200 body on both sides, or the
-# run stops with that as its first failure.
+# run stops with that as its first failure. That failure, and the
+# same one of the enrollment, names the two compile-time paths as
+# the likely cause.
 #
 # A request moves the stored state (OPS-GET). A correct PIN advances
 # the counter, and a wrong PIN adds a strike. A counter at or below
@@ -96,7 +103,7 @@
 #
 #	<object directory>
 #		The object directory of regress/Makefile: the program
-#		cgi and its two paths.
+#		cgi of 'make -C regress clean cgi', and its two paths.
 #
 #	<work directory>
 #		The work directory of regress/interop in the guest,
@@ -171,7 +178,8 @@ my $cgi    = "$obj/cgi";
 my $pins   = "$obj/pins";
 my $random = "$pins/.random";
 my $python = "$work/venv/bin/python";
-die "fuzz: $cgi: no such program; run make -C regress cgi\n" unless -x $cgi;
+die "fuzz: $cgi: no such program; run make -C regress clean cgi\n"
+    unless -x $cgi;
 die "fuzz: $python: no such program\n"                       unless -x $python;
 
 # The vectors of regress/vectors.h, as one text.
@@ -323,7 +331,9 @@ sub mutate ( $envelope, $from, $length, $count )
 # same($what, $path, $envelope):
 #	One well-formed request against both servers. Both must
 #	answer 200 with one identical body (D-12), or the run stops
-#	with the two answers as its first failure. Gives the body.
+#	with the two answers as its first failure. A program with the
+#	two paths of the fixed instance answers so, and the message
+#	names the two paths as the likely cause. Gives the body.
 sub same ( $what, $path, $envelope )
 {
 	my $body = body($envelope);
@@ -336,7 +346,10 @@ sub same ( $what, $path, $envelope )
 	    && $o->{body} eq $u->{body};
 	my $file = report( $what, $body, $o, $u, $o->{status} // 'none',
 		$u->{status} );
-	die "fuzz: $what: the two answers differ, see $file\n";
+	die "fuzz: $what: the two answers differ, see $file\n"
+	    . "fuzz: the likely cause: $cgi holds another PINS_DIR or "
+	    . "KEY_PATH than $pins and $obj/private.key; run make -C regress "
+	    . "clean cgi\n";
 }
 
 # trial($what, $envelope, $allowed):
