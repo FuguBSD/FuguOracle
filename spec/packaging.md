@@ -24,8 +24,10 @@ CONFIGURE_ARGS = --enable-module-ecdh \
 - **PKG-SECP-1** — The port must enable the modules `ecdh`, `recovery`, and
   `extrakeys`, and must not enable `schnorrsig`, `ellswift`, `musig`, or
   `silentpayments`.
-- **PKG-SECP-2** — The port must ship `libsecp256k1.a`, the headers, and the
-  pkg-config file.
+- **PKG-SECP-2** — The port must ship `libsecp256k1.a`, the shared library
+  `libsecp256k1.so`, the headers, and the pkg-config file. The libtool of the
+  ports tree ignores `--disable-shared`, so the port declares the shared library
+  with `SHARED_LIBS` and ships it.
 - **PKG-SECP-3** — The `do-test` target must run the upstream test suite.
 
 The library is MIT licensed and builds cleanly with base clang. It is useful
