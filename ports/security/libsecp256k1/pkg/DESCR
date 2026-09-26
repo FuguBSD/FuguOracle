@@ -1,0 +1,8 @@
+libsecp256k1 is an optimized C library for elliptic curve operations
+on the curve secp256k1: key generation, ECDSA signatures and their
+verification, public key recovery, ECDH, and the x-only public keys
+of the extrakeys module.
+
+This package builds the static archive with the modules ecdh,
+recovery and extrakeys, and it installs the headers and the
+pkg-config file.

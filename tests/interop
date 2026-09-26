@@ -53,7 +53,7 @@
 # saves the snapshot (TEST-INTEROP-5). Exit code 7 of the wait
 # reports a timeout. The provisioning holds, one call for each step:
 # the packages, then the Fugu distribution, then tests/guest for
-# the library, the programs and the regression tests, then the
+# the library port, the programs and the regression tests, then the
 # upstream checkout and the Python distributions by 'fuguvm put',
 # then a venv, then the pip run, then an import of wallycore, flask
 # and requests. The Fugu step puts the Fugu distribution tarball of
@@ -131,10 +131,6 @@
 #		PATH. fuguvm needs the modules of FuguVM and the
 #		agent socket of the guest, so the caller sets
 #		PERL5LIB and SSH_AUTH_SOCK for it.
-#
-#	FUGUORACLE_SECP256K1
-#		The libsecp256k1 release tarball. tests/guest takes
-#		it, and its header states the source of it.
 #
 #	FUGUORACLE_FUGU
 #		The Fugu distribution tarball: the release asset that
@@ -455,10 +451,8 @@ sub provision ()
 	put( $ENV{FUGUORACLE_FUGU}, "$WORK/Fugu.tar.gz" );
 	guest_ok( 'the Fugu distribution', $FUGU, $TIMEOUT{build} );
 
-	step('the library, the programs and the regression tests');
-	host_ok(
-		'tests/guest',
-		[ "$ROOT/tests/guest", $ENV{FUGUORACLE_SECP256K1} ],
+	step('the library port, the programs and the regression tests');
+	host_ok( 'tests/guest', ["$ROOT/tests/guest"],
 		timeout => $TIMEOUT{build} );
 
 	step('the upstream checkout');
@@ -685,15 +679,12 @@ sub check ($key)
 }
 
 for my $name (
-	qw(FUGUORACLE_SECP256K1 FUGUORACLE_FUGU FUGUORACLE_BLIND_PIN_SERVER
-	FUGUORACLE_PYPI) )
+	qw(FUGUORACLE_FUGU FUGUORACLE_BLIND_PIN_SERVER FUGUORACLE_PYPI) )
 {
 	die "interop: $name is not set; the header of tests/interop "
 	    . "states each variable\n"
 	    unless defined $ENV{$name} && length $ENV{$name};
 }
-die "interop: $ENV{FUGUORACLE_SECP256K1}: no such file\n"
-    unless -f $ENV{FUGUORACLE_SECP256K1};
 die "interop: $ENV{FUGUORACLE_FUGU}: no such file\n"
     unless -f $ENV{FUGUORACLE_FUGU};
 die "interop: $ENV{FUGUORACLE_BLIND_PIN_SERVER}: no such directory\n"

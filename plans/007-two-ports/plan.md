@@ -2,11 +2,10 @@
 
 ## Status
 
-Proposed. The tree holds the two programs, and this plan waits on plan 005 for
-the deployment files.
+In progress. The library port and the guest build of it landed. The service
+port, the pkg-readme, the manual page and the live test remain.
 
-Implements: PKG-SECP, PKG-ORACLE, DEPLOY-BACKUP, CLIENT-PROVISION, CLIENT-JADE,
-TEST-LIVE.
+Implements: PKG-ORACLE, DEPLOY-BACKUP, CLIENT-PROVISION, CLIENT-JADE, TEST-LIVE.
 
 ## Purpose
 
@@ -47,25 +46,20 @@ PKG-ORACLE-7). A port never depends on `fuguvm`.
 
 ## Files
 
-| File                                    | Change                                                                                |
-| --------------------------------------- | ------------------------------------------------------------------------------------- |
-| `ports/security/libsecp256k1/Makefile`  | The library port                                                                      |
-| `ports/security/libsecp256k1/distinfo`  | The pinned distfile                                                                   |
-| `ports/security/libsecp256k1/pkg/DESCR` | The description                                                                       |
-| `ports/security/libsecp256k1/pkg/PLIST` | The archive, the headers, the pkg-config file                                         |
-| `ports/security/fuguoracle/Makefile`    | The service port, with `WRKSRC` at the `src` directory of the distfile (ARCH-BUILD-2) |
-| `ports/security/fuguoracle/distinfo`    | The pinned tag                                                                        |
-| `ports/security/fuguoracle/pkg/DESCR`   | The description                                                                       |
-| `ports/security/fuguoracle/pkg/PLIST`   | The files, the user, the sample directories                                           |
-| `ports/security/fuguoracle/pkg/README`  | The bring-up, the backup, the rotation, the live test                                 |
-| `src/fuguoracle/fuguoracle.8`           | The backup and the provisioning statements                                            |
-| `tests/guest`                           | The port build in place of the tarball build                                          |
-| `spec/STATUS.md`                        | The cited units                                                                       |
+| File                                   | Change                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `ports/security/fuguoracle/Makefile`   | The service port, with `WRKSRC` at the `src` directory of the distfile (ARCH-BUILD-2) |
+| `ports/security/fuguoracle/distinfo`   | The pinned tag                                                                        |
+| `ports/security/fuguoracle/pkg/DESCR`  | The description                                                                       |
+| `ports/security/fuguoracle/pkg/PLIST`  | The files, the user, the sample directories                                           |
+| `ports/security/fuguoracle/pkg/README` | The bring-up, the backup, the rotation, the live test                                 |
+| `src/fuguoracle/fuguoracle.8`          | The backup and the provisioning statements                                            |
+| `spec/STATUS.md`                       | The cited units                                                                       |
 
 ## Tests
 
-- `make port-lib-check` and `make lint` of the ports tree pass on both ports, in
-  the guest.
+- `portcheck` and `make port-lib-depends-check` of the ports tree pass on both
+  ports, in the guest.
 - `make regress` of the service port passes with the network off.
 - A `pkg_add` of the built package, then the bring-up of DEPLOY-SERVICE, serves
   one round trip from the upstream `client.py`.

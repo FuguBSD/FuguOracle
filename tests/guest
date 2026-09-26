@@ -14,15 +14,32 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# guest: build the library, the two programs and the tests in the
-# OpenBSD guest, and run each test there (ARCH-DEPS-5).
+# guest: build the library port, the archive, the two programs and
+# the tests in the OpenBSD guest, and run each test there
+# (ARCH-DEPS-5).
 #
-# usage: guest <libsecp256k1 tarball>
+# usage: guest
 #
-# The ports tree holds no libsecp256k1, so the guest builds the
-# library from an upstream release tarball. The developer fetches that
-# tarball from the address that spec/packaging.md names, and gives its
-# path to this script.
+# The guest builds the library from ports/security/libsecp256k1 of
+# the repository (PKG-SECP), in the ports tree of its release. The
+# script installs that tree when the guest holds none: it fetches
+# ports.tar.gz and SHA256.sig of the release from cdn.openbsd.org,
+# verifies the tarball with signify(1) against the base key of the
+# release, and extracts it. The ports infrastructure refuses a build
+# without the X11 sets, so the script installs xbase and xshare of
+# the release in the same way, when the guest holds none. The tree
+# sits on /usr/obj, and /usr/ports is a symbolic link to it. The root
+# and /usr partitions of the autoinstall layout hold a few hundred
+# megabytes, and /usr/obj holds the tree, the work directories, the
+# distfiles and the packages with room to spare. Those three
+# directories sit under the tree by default, so the link puts them on
+# /usr/obj too, and the guest needs no /etc/mk.conf.
+#
+# The port fetches its distfile through the network of the guest. The
+# script deletes an installed package of the library and the work
+# directory of the port first, so the package reflects the port of
+# the working tree. It then runs the checks of the port: portcheck,
+# the library dependency check, and the upstream suite (PKG-SECP-3).
 #
 # The script drives the guest with fuguvm, as a command only
 # (TEST-INTEROP-4). FUGUVM names that command. The script stops at the
@@ -37,48 +54,91 @@ FUGUVM=${FUGUVM:-fuguvm}
 WORK=/home/fuguoracle
 
 # The guest layout, one for every script of tests: $WORK/src holds
-# src of the repository, and $WORK/tests holds tests. src holds the
-# flat sources, the archive, the two programs with their manual
-# pages, and the regression tests (ARCH-BUILD-2). tests holds the
-# host harness and the vectors, and the regression tests read the
-# vectors through the include path of tests (ARCH-BUILD-5). A new
-# file joins one of the two directories, and this script names no
-# file.
+# src of the repository, $WORK/tests holds tests, and $WORK/ports
+# holds ports. src holds the flat sources, the archive, the two
+# programs with their manual pages, and the regression tests
+# (ARCH-BUILD-2). tests holds the host harness and the vectors, and
+# the regression tests read the vectors through the include path of
+# tests (ARCH-BUILD-5). ports holds the two ports, and the library
+# port goes into the ports tree from there. A new file joins one of
+# the three directories, and this script names no file.
 
-# The autotools that build the library. The release tarball holds no
-# configure script, and the base system holds no autotools.
+# The ports tree, and the path that the ports infrastructure reads.
+TREE=/usr/obj/ports
+PORTS=/usr/ports
+
+# The library port, and the stem of its package.
+PORT=security/libsecp256k1
+PACKAGE=libsecp256k1
+
+# The mirror of the release sets.
+CDN=https://cdn.openbsd.org/pub/OpenBSD
+
+# The packages that the build dependencies of the port name: the
+# autotools that regenerate the configure script, because the
+# release tarball holds none. The port build resolves each
+# dependency from the installed packages, and it builds no other
+# port.
 PACKAGES="autoconf%2.71 automake%1.16 libtool"
-VERSIONS="AUTOCONF_VERSION=2.71 AUTOMAKE_VERSION=1.16"
 
-# The modules of PKG-SECP-1: ecdh, recovery and extrakeys, and no
-# other module. The program links the static archive (ARCH-DEPS-4).
-CONFIGURE="--prefix=/usr/local --disable-shared --enable-static \
-	--disable-benchmark --disable-tests --disable-exhaustive-tests \
-	--enable-module-ecdh --enable-module-recovery \
-	--enable-module-extrakeys --disable-module-schnorrsig \
-	--disable-module-ellswift --disable-module-musig \
-	--disable-module-silentpayments"
+# The X11 sets and the ports tree, for a guest that holds none.
+# signify(1) checks the signature of SHA256.sig and the checksum of
+# each tarball in one call.
+TREE_SCRIPT="set -e
+release=\$(uname -r)
+sets=\$(echo \$release | tr -d .)
+key=/etc/signify/openbsd-\$sets-base.pub
+cd $(dirname $TREE)
+if [ ! -f /usr/X11R6/man/mandoc.db ]; then
+	site=$CDN/\$release/\$(machine)
+	ftp -V \$site/xbase\$sets.tgz \$site/xshare\$sets.tgz \$site/SHA256.sig
+	signify -C -p \$key -x SHA256.sig xbase\$sets.tgz xshare\$sets.tgz
+	tar -C / -xzphf xbase\$sets.tgz
+	tar -C / -xzphf xshare\$sets.tgz
+	rm xbase\$sets.tgz xshare\$sets.tgz SHA256.sig
+fi
+if [ ! -f $PORTS/Makefile ]; then
+	ftp -V $CDN/\$release/ports.tar.gz $CDN/\$release/SHA256.sig
+	signify -C -p \$key -x SHA256.sig ports.tar.gz
+	tar xzf ports.tar.gz
+	rm ports.tar.gz SHA256.sig
+	ln -fhs $TREE $PORTS
+fi"
 
-if [ $# -ne 1 ] || [ ! -f "$1" ]; then
-	echo "usage: guest <libsecp256k1 tarball>" >&2
+# The library port: the copy into the tree, the package, and the
+# checks of the port.
+PORT_SCRIPT="set -e
+pkg_add -I $PACKAGES
+rm -rf $PORTS/$PORT
+cp -R $WORK/ports/$PORT $PORTS/$PORT
+cd $PORTS/$PORT
+if pkg_info -e '$PACKAGE-*' > /dev/null; then pkg_delete $PACKAGE; fi
+make clean='work packages'
+make install
+$PORTS/infrastructure/bin/portcheck
+make port-lib-depends-check
+make test"
+
+if [ $# -ne 0 ]; then
+	echo "usage: guest" >&2
 	exit 1
 fi
-tarball=$1
 root=$(dirname "$0")/..
 
 echo "guest: the source"
 $FUGUVM up
 $FUGUVM wait
-$FUGUVM ssh -- sh -c "rm -rf $WORK/src $WORK/tests $WORK/library; \
+$FUGUVM ssh -- sh -c "rm -rf $WORK/src $WORK/tests $WORK/ports; \
 	mkdir -p $WORK"
-$FUGUVM put "$tarball" "$WORK/library.tar.gz"
 $FUGUVM put "$root/src" "$WORK/src"
 $FUGUVM put "$root/tests" "$WORK/tests"
+$FUGUVM put "$root/ports" "$WORK/ports"
 
-echo "guest: the library"
-$FUGUVM ssh -- sh -c "set -e; pkg_add -I $PACKAGES; cd $WORK; \
-	mkdir library; tar xzf library.tar.gz -C library; cd library/*; \
-	$VERSIONS ./autogen.sh; ./configure $CONFIGURE; make; make install"
+echo "guest: the ports tree"
+$FUGUVM ssh -- sh -c "$TREE_SCRIPT"
+
+echo "guest: the library port"
+$FUGUVM ssh -- sh -c "$PORT_SCRIPT"
 
 echo "guest: the archive, the two programs and the tests"
 $FUGUVM ssh -- sh -c "cd $WORK/src; make"
