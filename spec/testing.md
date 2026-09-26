@@ -82,8 +82,8 @@ tool forwards the guest SSH port only.
   reject (an HTTP error status), a junk key, or a real key.
 - **TEST-FUZZ-2** — The fuzzer is a development-only Perl program on the Fugu
   library. The fuzzer must not enter the port.
-- **TEST-FUZZ-3** — The fuzzer must start each server with
-  `Fugu::Process->spawn_command`, and must stop each server with
+- **TEST-FUZZ-3** — The fuzzer must start the upstream server with
+  `Fugu::Process->spawn_command`, and must stop the upstream server with
   `Fugu::Process->terminate`. It must run each mutation with
   `Fugu::Process->run` and a `timeout`. It must draw each mutation with
   `Fugu::Random->random_bytes`. It must write each failing case with

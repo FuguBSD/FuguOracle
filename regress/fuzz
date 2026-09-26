@@ -1,0 +1,484 @@
+#!/usr/bin/env perl
+# ex:ts=8 sw=4:
+#
+# Copyright (c) 2026 Dick Olsson <hi@senzilla.io>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# fuzz: mutate one get_pin request, and hold the two servers to one
+# decision.
+#
+# usage: fuzz <object directory> <work directory> <case directory> [count]
+#
+# This program is the differential fuzzer of TEST-FUZZ. It is a
+# development tool: no .t file, no make check run, and no copy in the
+# port (TEST-FUZZ-2). It runs in the OpenBSD guest of regress/interop,
+# on the Fugu library, because the CGI program runs on OpenBSD alone
+# (TEST-FUZZ-4). The provisioning of that harness installs the library
+# into the guest, and 'fuguvm ssh' runs the fuzzer there. The fuzzer
+# runs no shell: each child is a Fugu::Process with an argument list.
+#
+# The FuguOracle side is the regress build of regress/Makefile, the
+# program cgi of <object directory>. The two compile-time paths of
+# that build, the record directory pins and the key file private.key,
+# sit in the same directory (D-06). The deploy of regress/interop
+# builds that program with the two paths of the fixed instance
+# instead (PINS_DIR and KEY_PATH). A plain 'make -C regress cgi'
+# rebuilds nothing after that deploy. The fuzzer therefore needs a
+# clean rebuild without the two overrides: 'make -C regress clean
+# cgi'. The fuzzer runs the program for each request, with
+# Fugu::Process->run and a timeout (TEST-FUZZ-3).
+# The request variables of PROG-CGI-1 and PROG-CGI-2 sit in the
+# environment of the child, and the body on standard input
+# (TEST-FUZZ-4). The seam of the regress build reads each draw from
+# the file that FUGUORACLE_RANDOM names (SEC-RANDOM-2). The program
+# unveils the key file and the record directory alone, so the fuzzer
+# copies regress/random.bin into the record directory, as
+# regress/cgi.sh does.
+#
+# The upstream side is regress/upstream-fixed.py: the upstream server
+# on the same random file, on port 8083 (D-12). regress/interop uses
+# 8080, 8081 and 8082 in the same guest. <work directory> is the work
+# directory of that harness, with the venv and the package
+# blind_pin_server. The fuzzer starts the server with
+# Fugu::Process->spawn_command, and it stops the server with
+# Fugu::Process->terminate at each end of a run (TEST-FUZZ-3). The
+# upstream server reads its key file and its record directory from
+# its working directory. spawn_command moves no child, so the fuzzer
+# enters the run directory for the one spawn call, and leaves it
+# again. That run directory is a temporary directory under <object
+# directory>. The log of the server sits there for the length of the
+# run. The fuzzer waits for the port with a bounded count of tries
+# before the first request.
+#
+# Both servers hold the static key of regress/vectors.h, so the two
+# pinned envelopes of that file are the seed. The set_pin envelope
+# enrolls one record on each server, and the get_pin envelope is the
+# request that the fuzzer mutates. No client library takes part, so
+# the run needs no Python beside the upstream server.
+#
+# The decision is one of three (TEST-FUZZ-1). An HTTP error status is
+# a reject. A 200 body that equals the 200 body of the unmutated
+# request is the real key. D-12 gives byte-identical 200 bodies for
+# identical input and identical stored state under the fixed random
+# source. The fuzzer therefore decrypts nothing. Each other 200 body
+# is junk. The fuzzer proves that premise first. The unmutated
+# request must answer one identical 200 body on both sides, or the
+# run stops with that as its first failure. That failure, and the
+# same one of the enrollment, names the two compile-time paths as
+# the likely cause.
+#
+# A request moves the stored state (OPS-GET). A correct PIN advances
+# the counter, and a wrong PIN adds a strike. A counter at or below
+# the stored one is a replay. Both record stores are files on disk,
+# and the upstream server caches no record. The fuzzer therefore
+# saves the two stores after the enrollment, and it writes them back
+# before each mutation.
+#
+# Each mutation changes one to four bytes of the envelope, at
+# positions and to values that Fugu::Random->random_bytes draws. Each
+# byte changes to another value. The JSON body around the envelope
+# stays well formed, and the length of the envelope stays. Two
+# directed cases run before the random loop. One byte of the tag
+# alone: both servers must reject it. One byte of the cke alone: both
+# must reject it, or answer with junk. One Fugu::Signal manager with
+# setup_interrupt_flag stops the loop between two mutations. A failed
+# case is one file under <case directory>, through
+# Fugu::File->write_atomic: the body and both answers (TEST-FUZZ-3).
+# The fuzzer prints one TAP line for each directed case, and one for
+# the random loop. A comment line holds the count of each decision
+# class. The fuzzer exits non-zero on any failure.
+#
+# The fuzzer reads no environment variable. These are the arguments:
+#
+#	<object directory>
+#		The object directory of regress/Makefile: the program
+#		cgi of 'make -C regress clean cgi', and its two paths.
+#
+#	<work directory>
+#		The work directory of regress/interop in the guest,
+#		with venv and blind_pin_server.
+#
+#	<case directory>
+#		The directory of the failed cases. The fuzzer creates
+#		it when it is absent.
+#
+#	count	The count of random mutations. The default is 10000.
+
+use v5.34;
+use warnings;
+use experimental 'signatures';
+no feature qw(indirect multidimensional bareword_filehandles);
+
+use Cwd          qw(abs_path getcwd);
+use File::Temp   ();
+use FindBin      qw($RealBin);
+use HTTP::Tiny   ();
+use MIME::Base64 qw(encode_base64);
+
+use Fugu::File;
+use Fugu::Process;
+use Fugu::Random;
+use Fugu::Signal;
+
+# The port of the upstream server. regress/interop uses 8080, 8081
+# and 8082 in the same guest.
+my $PORT = 8083;
+my $URL  = "http://127.0.0.1:$PORT";
+
+# The count of random mutations of a run without the count argument.
+my $COUNT = 10000;
+
+# The seconds of one CGI run and of one HTTP request (TEST-FUZZ-3).
+my $TIMEOUT = 30;
+
+# The tries of the wait for the upstream server, half a second apart.
+my $TRIES = 60;
+
+# The bytes of one random mutation, at most.
+my $BYTES = 4;
+
+# The two fields of the request envelope that the directed cases
+# mutate: the cke at the front, and the tag at the end
+# (PROTO-ENVELOPE).
+my $CKE_LEN = 33;
+my $TAG_LEN = 32;
+
+# The decisions of a random case: each one, so the two sides must
+# agree alone.
+my @DECISIONS = qw(reject junk real);
+
+# The client of each HTTP request.
+my $HTTP = HTTP::Tiny->new( timeout => $TIMEOUT );
+
+# The arguments.
+die "usage: fuzz <object directory> <work directory> <case directory> "
+    . "[count]\n"
+    unless @ARGV == 3
+    || ( @ARGV == 4 && $ARGV[3] =~ /\A[1-9][0-9]*\z/ );
+Fugu::File->ensure_dir( $ARGV[2] )
+    or die "fuzz: $ARGV[2]: cannot create the case directory\n";
+my ( $obj, $work, $cases ) =
+    map { abs_path($_) // die "fuzz: $_: no such directory\n" } @ARGV[ 0 .. 2 ];
+my $count = $ARGV[3] // $COUNT;
+
+# The program and the two paths of the regress build, the random
+# file inside the record directory, and the interpreter of the venv.
+my $cgi    = "$obj/cgi";
+my $pins   = "$obj/pins";
+my $random = "$pins/.random";
+my $python = "$work/venv/bin/python";
+die "fuzz: $cgi: no such program; run make -C regress clean cgi\n"
+    unless -x $cgi;
+die "fuzz: $python: no such program\n"                       unless -x $python;
+
+# The vectors of regress/vectors.h, as one text.
+my $VECTORS = Fugu::File->read("$RealBin/vectors.h")
+    // die "fuzz: $RealBin/vectors.h: cannot read the vectors\n";
+
+# The run directory of the upstream server: its key file, its record
+# directory and its log. File::Temp removes it at the exit.
+my $run = File::Temp->newdir( TEMPLATE => 'fuzz.XXXXXX', DIR => $obj );
+
+# The two stores after the enrollment, and the 200 body of the
+# unmutated request.
+my %SAVED;
+my $REAL;
+
+# vector($name):
+#	The bytes of one hex vector of regress/vectors.h.
+sub vector ($name)
+{
+	my ($hex) = $VECTORS =~ /^#define[ \t]+$name[ \t]+"([0-9a-f]+)"/m
+	    or die "fuzz: vectors.h holds no $name\n";
+	return pack 'H*', $hex;
+}
+
+# body($envelope):
+#	The request body of one envelope (PROTO-HTTP-7).
+sub body ($envelope)
+{
+	return '{"data": "' . encode_base64( $envelope, q{} ) . '"}';
+}
+
+# oracle($path, $body):
+#	One request of the CGI program: the variables of PROG-CGI-1
+#	and PROG-CGI-2 in the environment of the child, and the body
+#	on its standard input (TEST-FUZZ-4). Gives the answer: the
+#	status, the body, and the text of the whole answer. A run that
+#	wrote no status line gives no status.
+sub oracle ( $path, $body )
+{
+	my $result = Fugu::Process->run(
+		cmd     => [$cgi],
+		stdin   => $body,
+		timeout => $TIMEOUT,
+		env     => {
+			REQUEST_METHOD    => 'POST',
+			DOCUMENT_URI      => $path,
+			CONTENT_LENGTH    => length $body,
+			FUGUORACLE_RANDOM => $random
+		} );
+	my $text = $result->{error} // (
+		$result->{timed_out}
+		? "no answer in $TIMEOUT s\n"
+		: $result->{stdout} );
+	my ( $status, $answer ) =
+	    $text =~
+	    /\AStatus: ([0-9]{3})[^\n]*\r\n(?:[^\n]*\r\n)*?\r\n(.*)\z/s;
+	return { status => $status, body => $answer, text => $text };
+}
+
+# upstream($path, $body):
+#	One request of the upstream server, and its answer in the
+#	same shape. A server that answers nothing ends the run.
+sub upstream ( $path, $body )
+{
+	my $r = $HTTP->post( "$URL$path", { content => $body } );
+	die "fuzz: the upstream server: $r->{content}\n" if $r->{status} == 599;
+	return {
+		status => $r->{status},
+		body   => $r->{content},
+		text   => "$r->{status} $r->{reason}\n$r->{content}"
+	};
+}
+
+# decision($answer):
+#	The decision of one answer (TEST-FUZZ-1): reject, real, junk,
+#	or none for an answer without a status.
+sub decision ($answer)
+{
+	return 'none' unless defined $answer->{status};
+	return 'reject' if $answer->{status} != 200;
+	return 'real'   if $answer->{body} eq $REAL;
+	return 'junk';
+}
+
+# report($what, $body, $oracle, $upstream, $od, $ud):
+#	One file of a failed case under the case directory: the body
+#	and both answers, with the two decisions (TEST-FUZZ-3). Gives
+#	the path of the file.
+sub report ( $what, $body, $oracle, $upstream, $od, $ud )
+{
+	my $file = "$cases/" . ( $what =~ s/ /-/gr ) . '.txt';
+	Fugu::File->write_atomic( $file,
+		      "fuzz: $what: fuguoracle $od, upstream $ud\n"
+		    . "body: $body\n\nfuguoracle:\n$oracle->{text}\n\n"
+		    . "upstream:\n$upstream->{text}\n" )
+	    or die "fuzz: $file: the write failed\n";
+	return $file;
+}
+
+# records($dir):
+#	The record files of one store: each name, and its bytes.
+sub records ($dir)
+{
+	opendir my $dh, $dir or die "fuzz: $dir: $!\n";
+	my %record =
+	    map {
+		$_ => Fugu::File->read("$dir/$_") // die "fuzz: $dir/$_: $!\n"
+	    }
+	    grep { /\.pin\z/ } readdir $dh;
+	closedir $dh;
+	return \%record;
+}
+
+# restore($dir, $records):
+#	The store at $dir, with the saved records and no other one.
+sub restore ( $dir, $records )
+{
+	opendir my $dh, $dir or die "fuzz: $dir: $!\n";
+	for my $name ( grep { /\.pin\z/ } readdir $dh ) {
+		unlink "$dir/$name" or die "fuzz: $dir/$name: $!\n";
+	}
+	closedir $dh;
+	for my $name ( sort keys %$records ) {
+		Fugu::File->write_atomic( "$dir/$name", $records->{$name} )
+		    or die "fuzz: $dir/$name: the write failed\n";
+	}
+	return;
+}
+
+# mutate($envelope, $from, $length, $count):
+#	A copy of the envelope with $count bytes changed inside the
+#	$length bytes from $from. Fugu::Random->random_bytes draws
+#	each position and each value (TEST-FUZZ-3), and each byte
+#	changes to another value.
+sub mutate ( $envelope, $from, $length, $count )
+{
+	my $draw = Fugu::Random->random_bytes( 3 * $count );
+	for my $i ( 0 .. $count - 1 ) {
+		my ( $position, $value ) = unpack 'n C',
+		    substr( $draw, 3 * $i, 3 );
+		my $at  = $from + $position % $length;
+		my $old = ord substr( $envelope, $at, 1 );
+		substr( $envelope, $at, 1,
+			chr( ( $old + 1 + $value % 255 ) % 256 ) );
+	}
+	return $envelope;
+}
+
+# same($what, $path, $envelope):
+#	One well-formed request against both servers. Both must
+#	answer 200 with one identical body (D-12), or the run stops
+#	with the two answers as its first failure. A program with the
+#	two paths of the fixed instance answers so, and the message
+#	names the two paths as the likely cause. Gives the body.
+sub same ( $what, $path, $envelope )
+{
+	my $body = body($envelope);
+	my $o    = oracle( $path, $body );
+	my $u    = upstream( $path, $body );
+	return $o->{body}
+	    if defined $o->{status}
+	    && $o->{status} == 200
+	    && $u->{status} == 200
+	    && $o->{body} eq $u->{body};
+	my $file = report( $what, $body, $o, $u, $o->{status} // 'none',
+		$u->{status} );
+	die "fuzz: $what: the two answers differ, see $file\n"
+	    . "fuzz: the likely cause: $cgi holds another PINS_DIR or "
+	    . "KEY_PATH than $pins and $obj/private.key; run make -C regress "
+	    . "clean cgi\n";
+}
+
+# trial($what, $envelope, $allowed):
+#	One mutated request against both servers, from the restored
+#	stores. The trial passes when the two decisions agree, and the
+#	decision is one of $allowed. Gives the joint decision, and
+#	whether the trial passed.
+sub trial ( $what, $envelope, $allowed )
+{
+	restore( $pins,       $SAVED{oracle} );
+	restore( "$run/pins", $SAVED{upstream} );
+	my $body = body($envelope);
+	my $o    = oracle( '/get_pin', $body );
+	my $u    = upstream( '/get_pin', $body );
+	my ( $od, $ud ) = ( decision($o), decision($u) );
+	return ( $od, 1 ) if $od eq $ud && grep { $_ eq $od } @$allowed;
+	report( $what, $body, $o, $u, $od, $ud );
+	return ( $od eq $ud ? $od : "$od/$ud", 0 );
+}
+
+# tally($tally):
+#	The count of each decision class, as one line.
+sub tally ($tally)
+{
+	return join ', ', map { "$_ $tally->{$_}" } sort keys %$tally;
+}
+
+# upstream_start():
+#	The upstream server on the fixed random file, in the run
+#	directory, and reachable. Gives its pid. A server that
+#	answers nothing in the tries ends the run with its log.
+sub upstream_start ()
+{
+	my $cwd = getcwd();
+	chdir $run or die "fuzz: $run: $!\n";
+	my $result = Fugu::Process->spawn_command(
+		cmd => [
+			$python,               "$RealBin/upstream-fixed.py",
+			"$RealBin/random.bin", $PORT
+		],
+		env    => { %ENV, PYTHONPATH => $work },
+		stderr => "$run/server.log"
+	);
+	chdir $cwd or die "fuzz: $cwd: $!\n";
+	die "fuzz: the upstream server: $result->{error}\n"
+	    unless $result->{success};
+	my $pid = $result->{pid};
+	for ( 1 .. $TRIES ) {
+		return $pid if $HTTP->get("$URL/")->{success};
+		last unless Fugu::Process->is_alive($pid);
+		select( undef, undef, undef, 0.5 );
+	}
+	Fugu::Process->terminate($pid);
+	die "fuzz: the upstream server answers nothing on port $PORT\n"
+	    . ( Fugu::File->read("$run/server.log") // q{} );
+}
+
+# fuzz($sig):
+#	The run: the enrollment, the premise, the two directed cases,
+#	and the random loop. Gives the count of failed tests.
+sub fuzz ($sig)
+{
+	restore( $pins, {} );
+	same( 'the enrollment', '/set_pin', vector('V_SET_ENVELOPE') );
+	%SAVED = ( oracle => records($pins), upstream => records("$run/pins") );
+	my $seed = vector('V_GET_ENVELOPE');
+	$REAL = same( 'the unmutated request', '/get_pin', $seed );
+
+	my ( $test, $failed, %tally ) = ( 0, 0 );
+	for my $directed (
+		[ 'the tag', length($seed) - $TAG_LEN, $TAG_LEN, ['reject'] ],
+		[ 'the cke', 0, $CKE_LEN, [ 'reject', 'junk' ] ] )
+	{
+		my ( $what, $from, $length, $allowed ) = @$directed;
+		my ( $joint, $pass ) =
+		    trial( $what, mutate( $seed, $from, $length, 1 ),
+			$allowed );
+		my $verdict = $pass ? 'ok' : 'not ok';
+		$tally{$joint}++;
+		$failed++ unless $pass;
+		$test++;
+		say "$verdict $test - $what";
+	}
+
+	my $start = time;
+	my $bad   = 0;
+	for my $i ( 1 .. $count ) {
+		die "fuzz: interrupted before mutation $i: "
+		    . tally( \%tally ) . "\n"
+		    if $sig->interrupted;
+		my $bytes = 1 + ord( Fugu::Random->random_bytes(1) ) % $BYTES;
+		my ( $joint, $pass ) =
+		    trial( "mutation $i",
+			mutate( $seed, 0, length $seed, $bytes ),
+			\@DECISIONS );
+		$tally{$joint}++;
+		$bad++ unless $pass;
+	}
+	my $seconds = time - $start;
+	my $verdict = $bad ? 'not ok' : 'ok';
+	$test++;
+	say "# $count mutations in $seconds s: " . tally( \%tally );
+	say "$verdict $test - $count mutations, $bad disagreements";
+	say "1..$test";
+	return $failed + $bad;
+}
+
+Fugu::File->ensure_dir($pins) or die "fuzz: $pins: cannot create it\n";
+Fugu::File->ensure_dir("$run/pins")
+    or die "fuzz: $run/pins: cannot create it\n";
+my $key = vector('V_STATIC_PRIV');
+for my $file ( "$obj/private.key", "$run/server_private_key.key" ) {
+	Fugu::File->write( $file, $key, mode => 0600 )
+	    or die "fuzz: $file: the write failed\n";
+}
+Fugu::File->write( $random,
+	Fugu::File->read("$RealBin/random.bin")
+	    // die "fuzz: $RealBin/random.bin: cannot read it\n" )
+    or die "fuzz: $random: the write failed\n";
+
+my $sig = Fugu::Signal->new;
+$sig->setup_interrupt_flag( 'INT', 'TERM' );
+my $pid    = upstream_start();
+my $failed = eval { fuzz($sig) };
+my $error  = $@;
+Fugu::Process->terminate($pid)
+    or warn "fuzz: the upstream server $pid survives SIGKILL\n";
+if ($error) {
+	print STDERR $error;
+	exit 1;
+}
+exit( $failed ? 1 : 0 );

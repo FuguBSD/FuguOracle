@@ -52,11 +52,17 @@
 # the guest again with 'fuguvm up', provisions it, stops it, and
 # saves the snapshot (TEST-INTEROP-5). Exit code 7 of the wait
 # reports a timeout. The provisioning holds, one call for each step:
-# the packages, then regress/guest for the library, the programs and
-# the regression tests, then the upstream checkout and the Python
-# distributions by 'fuguvm put', then a venv, then the pip run, then
-# an import of wallycore, flask and requests. A change of one of these
-# steps needs a new snapshot: run 'fuguvm snapshot rm provisioned'.
+# the packages, then the Fugu distribution, then regress/guest for
+# the library, the programs and the regression tests, then the
+# upstream checkout and the Python distributions by 'fuguvm put',
+# then a venv, then the pip run, then an import of wallycore, flask
+# and requests. The Fugu step puts the Fugu distribution tarball of
+# the host into the guest, and installs it with its own Makefile.PL,
+# because the fuzzer of TEST-FUZZ runs in the guest on that library.
+# Each input of the provisioning is a signed package of pkg_add, a
+# hash-pinned Python distribution, or a file of the host. A change of
+# one of these steps needs a new snapshot: run 'fuguvm snapshot rm
+# provisioned'.
 #
 # The second part deploys the tree. The harness puts the tracked files
 # of the working tree into the guest with 'fuguvm put', and the guest
@@ -126,6 +132,12 @@
 #	FUGUORACLE_SECP256K1
 #		The libsecp256k1 release tarball. regress/guest takes
 #		it, and its header states the source of it.
+#
+#	FUGUORACLE_FUGU
+#		The Fugu distribution tarball: the release asset that
+#		the runtime line of deps/Darwin.txt names. The Fugu
+#		step puts it into the guest, and the guest installs it
+#		with its own Makefile.PL.
 #
 #	FUGUORACLE_BLIND_PIN_SERVER
 #		The directory of a git checkout of the upstream
@@ -197,7 +209,9 @@ my $UPSTREAM_COMMIT = '62b920ef50b8e035d26916d9ed77b42903664993';
 # The packages of the provisioning, beside the autotools that
 # regress/guest installs. The pip run builds wallycore from source: it
 # needs gmake for the automake tree, bash for a script of that tree,
-# and swig for the wrapper that the same tree removes.
+# and swig for the wrapper that the same tree removes. The Fugu step
+# needs no package: the base perl holds ExtUtils::MakeMaker, and Fugu
+# needs no module beyond the core.
 my $PACKAGES = 'python%3 py3-pip bash gmake swig';
 
 # The reports of the two check programs, on the host.
@@ -287,6 +301,18 @@ SH
 # of wallycore, and the build reads make and python from the PATH, so
 # the pip step puts the shim directory and the venv on the PATH.
 my $SHIM = "#!/bin/sh\nexec /usr/local/bin/gmake \"\$@\"\n";
+
+# The script of the Fugu distribution: the tarball at $WORK, extracted
+# and installed with its own Makefile.PL. The tarball holds one top
+# directory, Fugu-<version>, so the script enters it through a glob.
+# The script runs no 'make test': that suite needs Perl::Critic and
+# Perl::Tidy, and the guest needs the library alone.
+my $FUGU = <<"SH";
+set -e
+cd $WORK
+rm -rf Fugu && mkdir Fugu && tar xzf Fugu.tar.gz -C Fugu && cd Fugu/*
+perl Makefile.PL && make && make install
+SH
 
 # failure($what, $result):
 #	The message of one failed command: the reason, and the two
@@ -420,6 +446,11 @@ sub provision ()
 {
 	step('the packages');
 	guest_ok( 'the packages', "pkg_add -I $PACKAGES", $TIMEOUT{build} );
+
+	step('the Fugu distribution');
+	guest_ok( 'the work directory', "mkdir -p $WORK" );
+	put( $ENV{FUGUORACLE_FUGU}, "$WORK/Fugu.tar.gz" );
+	guest_ok( 'the Fugu distribution', $FUGU, $TIMEOUT{build} );
 
 	step('the library, the programs and the regression tests');
 	host_ok(
@@ -650,7 +681,8 @@ sub check ($key)
 }
 
 for my $name (
-	qw(FUGUORACLE_SECP256K1 FUGUORACLE_BLIND_PIN_SERVER FUGUORACLE_PYPI))
+	qw(FUGUORACLE_SECP256K1 FUGUORACLE_FUGU FUGUORACLE_BLIND_PIN_SERVER
+	FUGUORACLE_PYPI) )
 {
 	die "interop: $name is not set; the header of regress/interop "
 	    . "states each variable\n"
@@ -658,6 +690,8 @@ for my $name (
 }
 die "interop: $ENV{FUGUORACLE_SECP256K1}: no such file\n"
     unless -f $ENV{FUGUORACLE_SECP256K1};
+die "interop: $ENV{FUGUORACLE_FUGU}: no such file\n"
+    unless -f $ENV{FUGUORACLE_FUGU};
 die "interop: $ENV{FUGUORACLE_BLIND_PIN_SERVER}: no such directory\n"
     unless -d $ENV{FUGUORACLE_BLIND_PIN_SERVER};
 die "interop: $ENV{FUGUORACLE_PYPI}: no such directory\n"
