@@ -38,7 +38,7 @@
 #include <unistd.h>
 
 #include "cipher.h"
-#include "vectors.h"
+#include "vectors/vectors.h"
 
 /* The largest vector is the 229-byte envelope of the set_pin request. */
 #define BLOB_MAX	256

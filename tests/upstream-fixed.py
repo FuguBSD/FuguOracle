@@ -18,7 +18,7 @@
 
 usage: upstream-fixed.py <random file> <port>
 
-regress/interop puts this program into the OpenBSD guest, and it runs
+tests/interop puts this program into the OpenBSD guest, and it runs
 the program there, in a directory that holds the private key file of
 the upstream server and a 'pins' directory. The program puts a reader
 of the fixed random file in place of os.urandom, then it imports the

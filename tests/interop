@@ -52,7 +52,7 @@
 # the guest again with 'fuguvm up', provisions it, stops it, and
 # saves the snapshot (TEST-INTEROP-5). Exit code 7 of the wait
 # reports a timeout. The provisioning holds, one call for each step:
-# the packages, then the Fugu distribution, then regress/guest for
+# the packages, then the Fugu distribution, then tests/guest for
 # the library, the programs and the regression tests, then the
 # upstream checkout and the Python distributions by 'fuguvm put',
 # then a venv, then the pip run, then an import of wallycore, flask
@@ -64,18 +64,21 @@
 # one of these steps needs a new snapshot: run 'fuguvm snapshot rm
 # provisioned'.
 #
-# The second part deploys the tree. The harness puts the tracked files
-# of the working tree into the guest with 'fuguvm put', and the guest
-# builds them (ARCH-DEPS-5). The guest builds the CGI program a second
-# time, as the regress build of regress/Makefile with the two paths of
-# a second instance inside the httpd chroot: its own record directory
-# and its own key file under /fuguoracle-fixed. One step creates the
-# service account and the two directories of PKG-ORACLE-2 and
-# PKG-ORACLE-3, and the same two directories of the fixed instance.
-# One step installs the CGI program into the httpd chroot, the regress
-# build beside it as fuguoracle-fixed, and the key generator into
-# /usr/local/sbin. The harness puts the rc.d script and the httpd.conf
-# fragment of ports/security/fuguoracle in the same way
+# The second part deploys the tree. The harness puts src and tests of
+# the tracked working tree into the guest with 'fuguvm put', in the
+# layout of tests/guest: $WORK/src and $WORK/tests. The guest builds
+# src with src/Makefile (ARCH-DEPS-5). The guest builds the
+# CGI program a second time, as the regress build of
+# src/regress/Makefile with the two paths of a second instance inside
+# the httpd chroot: its own record directory and its own key file
+# under /fuguoracle-fixed. The first build made that program with the
+# two paths of the regress tree, so the second build cleans first.
+# One step creates the service account and the two directories of
+# PKG-ORACLE-2 and PKG-ORACLE-3, and the same two directories of the
+# fixed instance. One step installs the CGI program into the httpd
+# chroot, the regress build beside it as fuguoracle-fixed, and the key
+# generator into /usr/local/sbin. The harness puts the rc.d script and
+# the httpd.conf fragment of ports/security/fuguoracle in the same way
 # (TEST-INTEROP-7). The test config holds two server blocks. The first
 # one is the fragment with 'listen on lo0 port 8080' in place of the
 # TLS listen line and without the tls block, because the test needs no
@@ -87,14 +90,14 @@
 # program, so both blocks name the one socket of the rc.d script.
 # fuguoracle-keygen then makes a fresh key, and the fixed instance
 # gets a copy of it. rcctl starts httpd and the fuguoracle service.
-# The harness then starts regress/upstream-fixed.py: the upstream
+# The harness then starts tests/upstream-fixed.py: the upstream
 # server on a copy of the same key and on the same random file, on
 # port 8082 (D-12). That start is one simple command in the
 # background, and no compound list: ksh(1) forks a subshell for a
 # list, and that subshell waits for the server with a copy of the
 # SSH channel open, so the step never returns.
 #
-# regress/random.bin is the one fixed random source (TEST-ACCEPT-3),
+# tests/random.bin is the one fixed random source (TEST-ACCEPT-3),
 # and the harness puts it into the record directory of the fixed
 # instance, because the program unveils that directory and the key
 # file alone. The largest row of the draw table of TEST-ACCEPT-2 is
@@ -105,15 +108,15 @@
 # rewinds the file before each request. A run therefore needs 64
 # bytes, and the file holds 256: four times the largest row, so a draw
 # beyond the table moves a later draw and fails the comparison, and it
-# stops no server. 'dd if=/dev/urandom of=regress/random.bin bs=64
+# stops no server. 'dd if=/dev/urandom of=tests/random.bin bs=64
 # count=4' wrote the file once. The bytes are test data, not a secret.
 #
-# The third part is the check. The harness puts
-# regress/interop-upstream.py into the guest and runs it there. The
-# header of that program names the tests of the upstream suite that
-# run against the stack, and the tests that do not. The harness then
-# puts regress/interop-checks.py and runs it: the junk uniformity, the
-# failure table, and the byte identity of the two fixed servers
+# The third part is the check. The harness runs
+# tests/interop-upstream.py in the guest. The header of that program
+# names the tests of the upstream suite that run against the stack,
+# and the tests that do not. The harness then runs
+# tests/interop-checks.py: the junk uniformity, the failure table,
+# and the byte identity of the two fixed servers
 # (TEST-INTEROP-2, TEST-INTEROP-3, TEST-ACCEPT-1). The harness copies
 # each report out with 'fuguvm get' into scratch/ (TEST-INTEROP-7), it
 # prints one TAP line for each test, and it exits non-zero on any
@@ -130,7 +133,7 @@
 #		PERL5LIB and SSH_AUTH_SOCK for it.
 #
 #	FUGUORACLE_SECP256K1
-#		The libsecp256k1 release tarball. regress/guest takes
+#		The libsecp256k1 release tarball. tests/guest takes
 #		it, and its header states the source of it.
 #
 #	FUGUORACLE_FUGU
@@ -151,7 +154,7 @@
 #	FUGUORACLE_PYPI
 #		The directory of the Python distributions that the
 #		requirements file of the checkout pins: one wheel or
-#		one source archive for each pin. regress/pypi-fetch
+#		one source archive for each pin. tests/pypi-fetch
 #		builds that directory from the requirements file. The
 #		guest reaches no package index, so pip reads this
 #		directory alone.
@@ -184,7 +187,7 @@ my $SNAPSHOT = 'provisioned';
 
 # The work directory of the guest. It sits on /home, because the root
 # partition of the guest holds a few hundred megabytes only. It is
-# apart from the directory of regress/guest.
+# apart from the directory of tests/guest.
 my $WORK = '/home/fuguoracle/interop';
 
 # The public endpoint of the stack in the guest, without TLS.
@@ -207,7 +210,7 @@ my $UPSTREAM_URL  = "http://127.0.0.1:$UPSTREAM_PORT";
 my $UPSTREAM_COMMIT = '62b920ef50b8e035d26916d9ed77b42903664993';
 
 # The packages of the provisioning, beside the autotools that
-# regress/guest installs. The pip run builds wallycore from source: it
+# tests/guest installs. The pip run builds wallycore from source: it
 # needs gmake for the automake tree, bash for a script of that tree,
 # and swig for the wrapper that the same tree removes. The Fugu step
 # needs no package: the base perl holds ExtUtils::MakeMaker, and Fugu
@@ -454,8 +457,8 @@ sub provision ()
 
 	step('the library, the programs and the regression tests');
 	host_ok(
-		'regress/guest',
-		[ "$ROOT/regress/guest", $ENV{FUGUORACLE_SECP256K1} ],
+		'tests/guest',
+		[ "$ROOT/tests/guest", $ENV{FUGUORACLE_SECP256K1} ],
 		timeout => $TIMEOUT{build} );
 
 	step('the upstream checkout');
@@ -545,13 +548,15 @@ sub deploy ()
 {
 	step('the tree');
 	guest_ok( 'the source directory',
-		"rm -rf $WORK/src && mkdir -p $WORK/src $WORK/run" );
-	put( tracked($ROOT), "$WORK/src" );
+		"rm -rf $WORK/src $WORK/tests && mkdir -p $WORK/run" );
+	my $stage = tracked($ROOT);
+	put( "$stage/src",   "$WORK/src" );
+	put( "$stage/tests", "$WORK/tests" );
 
 	step('the build');
 	guest_ok(
 		'the build',
-		"cd $WORK/src && make && make -C regress cgi "
+		"cd $WORK/src && make && make -C regress clean cgi "
 		    . "PINS_DIR=$FIXED/pins KEY_PATH=$FIXED/private.key",
 		$TIMEOUT{build}
 	);
@@ -562,10 +567,11 @@ sub deploy ()
 	step('the programs');
 	guest_ok(
 		'the programs',
-		"cd $WORK/src && install -o root -g bin -m 0555 fuguoracle "
-		    . "/var/www/cgi-bin/fuguoracle && install -o root -g bin "
-		    . "-m 0555 regress/cgi /var/www/cgi-bin/fuguoracle-fixed && "
-		    . "install -o root -g bin -m 0555 fuguoracle-keygen "
+		"cd $WORK/src && install -o root -g bin -m 0555 "
+		    . "fuguoracle/fuguoracle /var/www/cgi-bin/fuguoracle && "
+		    . "install -o root -g bin -m 0555 regress/cgi "
+		    . "/var/www/cgi-bin/fuguoracle-fixed && install -o root "
+		    . "-g bin -m 0555 fuguoracle-keygen/fuguoracle-keygen "
 		    . "/usr/local/sbin/fuguoracle-keygen"
 	);
 
@@ -585,7 +591,7 @@ sub deploy ()
 	    unless $key =~ /\A[0-9a-f]{66}\z/;
 
 	step('the fixed random file');
-	put( "$ROOT/regress/random.bin", "/var/www$RANDOM", '--mode', '0444' );
+	put( "$ROOT/tests/random.bin", "/var/www$RANDOM", '--mode', '0444' );
 
 	step('the services');
 	guest_ok(
@@ -596,7 +602,6 @@ sub deploy ()
 	);
 
 	step('the upstream server on the fixed random file');
-	put( "$ROOT/regress/upstream-fixed.py", "$WORK/upstream-fixed.py" );
 	guest_ok(
 		'the upstream server',
 		"set -e\nrm -rf $WORK/fixed && mkdir -p $WORK/fixed/pins\n"
@@ -604,8 +609,9 @@ sub deploy ()
 		    . "$WORK/fixed/server_private_key.key\n"
 		    . "cd $WORK/fixed\n"
 		    . "PYTHONPATH=$WORK nohup $WORK/venv/bin/python "
-		    . "$WORK/upstream-fixed.py /var/www$RANDOM $UPSTREAM_PORT "
-		    . "< /dev/null > $WORK/fixed/server.log 2>&1 &\n"
+		    . "$WORK/tests/upstream-fixed.py /var/www$RANDOM "
+		    . "$UPSTREAM_PORT < /dev/null "
+		    . "> $WORK/fixed/server.log 2>&1 &\n"
 		    . reach($UPSTREAM_URL)
 	);
 	return $key;
@@ -661,19 +667,17 @@ sub check ($key)
 	my $count = 0;
 
 	step('the upstream test suite');
-	put( "$ROOT/regress/interop-upstream.py", "$WORK/interop-upstream.py" );
 	guest_ok(
 		'the run directory',
 "rm -f $WORK/run/pins && ln -s /var/www/fuguoracle/pins $WORK/run/pins"
 	);
 	my $failed = report( 'the upstream test suite',
-		"$WORK/interop-upstream.py $URL $key",
+		"$WORK/tests/interop-upstream.py $URL $key",
 		$REPORT{upstream}, \$count );
 
 	step('the checks');
-	put( "$ROOT/regress/interop-checks.py", "$WORK/interop-checks.py" );
 	$failed += report( 'the checks',
-		"$WORK/interop-checks.py $URL $FIXED_URL $UPSTREAM_URL $key",
+		"$WORK/tests/interop-checks.py $URL $FIXED_URL $UPSTREAM_URL $key",
 		$REPORT{checks}, \$count );
 
 	say "1..$count";
@@ -684,7 +688,7 @@ for my $name (
 	qw(FUGUORACLE_SECP256K1 FUGUORACLE_FUGU FUGUORACLE_BLIND_PIN_SERVER
 	FUGUORACLE_PYPI) )
 {
-	die "interop: $name is not set; the header of regress/interop "
+	die "interop: $name is not set; the header of tests/interop "
 	    . "states each variable\n"
 	    unless defined $ENV{$name} && length $ENV{$name};
 }

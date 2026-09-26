@@ -54,7 +54,7 @@
 
 #include "cipher.h"
 #include "pindb.h"
-#include "vectors.h"
+#include "vectors/vectors.h"
 
 /*
  * The offsets of the record file (STORE-RECORD). The test names them

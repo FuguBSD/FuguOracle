@@ -61,7 +61,7 @@
 #include "cipher.h"
 #include "oracle.h"
 #include "pindb.h"
-#include "vectors.h"
+#include "vectors/vectors.h"
 
 /* The offset of the encrypted part of a request (PROTO-ENVELOPE). */
 #define ENV_ENC_OFF	(CIPHER_PUBKEY_LEN + 4)

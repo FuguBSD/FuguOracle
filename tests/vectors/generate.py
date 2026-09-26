@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-"""Write regress/vectors.h from libwally (TEST-KAT-1).
+"""Write vectors.h beside this file from libwally (TEST-KAT-1).
 
 usage: python3 generate.py
 
@@ -54,7 +54,7 @@ LICENSE = """\
 /*
  * The known-answer vectors of the cipher shim (TEST-KAT-1).
  *
- * regress/vectors/generate.py writes this file from libwally. Do not
+ * tests/vectors/generate.py writes this file from libwally. Do not
  * edit it. Every value is a hex string, and a counter or a parity
  * bit is a decimal number. Each request of the transcript holds both
  * sides, so a client implementation reads the same file.
@@ -291,7 +291,7 @@ def emit(entries):
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(here, os.pardir, "vectors.h"), "w") as out:
+    with open(os.path.join(here, "vectors.h"), "w") as out:
         out.write(emit(vectors()))
     return 0
 

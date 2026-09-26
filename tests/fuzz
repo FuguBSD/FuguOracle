@@ -22,32 +22,36 @@
 #
 # This program is the differential fuzzer of TEST-FUZZ. It is a
 # development tool: no .t file, no make check run, and no copy in the
-# port (TEST-FUZZ-2). It runs in the OpenBSD guest of regress/interop,
+# port (TEST-FUZZ-2). It runs in the OpenBSD guest of tests/interop,
 # on the Fugu library, because the CGI program runs on OpenBSD alone
 # (TEST-FUZZ-4). The provisioning of that harness installs the library
 # into the guest, and 'fuguvm ssh' runs the fuzzer there. The fuzzer
 # runs no shell: each child is a Fugu::Process with an argument list.
 #
-# The FuguOracle side is the regress build of regress/Makefile, the
-# program cgi of <object directory>. The two compile-time paths of
-# that build, the record directory pins and the key file private.key,
-# sit in the same directory (D-06). The deploy of regress/interop
-# builds that program with the two paths of the fixed instance
-# instead (PINS_DIR and KEY_PATH). A plain 'make -C regress cgi'
+# The fuzzer runs in the guest layout of tests/guest and
+# tests/interop: <work directory>/src holds src of the repository,
+# <work directory>/tests holds tests, and the fuzzer is
+# <work directory>/tests/fuzz there. The FuguOracle side is the
+# regress build of src/regress/Makefile, the program cgi of <object
+# directory>. The two compile-time paths of that build, the record
+# directory pins and the key file private.key, sit in the same
+# directory (D-06). The deploy of tests/interop builds that program
+# with the two paths of the fixed instance instead (PINS_DIR and
+# KEY_PATH). A plain 'make -C regress cgi' in <work directory>/src
 # rebuilds nothing after that deploy. The fuzzer therefore needs a
 # clean rebuild without the two overrides: 'make -C regress clean
-# cgi'. The fuzzer runs the program for each request, with
-# Fugu::Process->run and a timeout (TEST-FUZZ-3).
+# cgi' in that directory. The fuzzer runs the program for each
+# request, with Fugu::Process->run and a timeout (TEST-FUZZ-3).
 # The request variables of PROG-CGI-1 and PROG-CGI-2 sit in the
 # environment of the child, and the body on standard input
 # (TEST-FUZZ-4). The seam of the regress build reads each draw from
 # the file that FUGUORACLE_RANDOM names (SEC-RANDOM-2). The program
 # unveils the key file and the record directory alone, so the fuzzer
-# copies regress/random.bin into the record directory, as
-# regress/cgi.sh does.
+# copies tests/random.bin into the record directory, as
+# src/regress/cgi.sh does.
 #
-# The upstream side is regress/upstream-fixed.py: the upstream server
-# on the same random file, on port 8083 (D-12). regress/interop uses
+# The upstream side is tests/upstream-fixed.py: the upstream server
+# on the same random file, on port 8083 (D-12). tests/interop uses
 # 8080, 8081 and 8082 in the same guest. <work directory> is the work
 # directory of that harness, with the venv and the package
 # blind_pin_server. The fuzzer starts the server with
@@ -61,8 +65,8 @@
 # run. The fuzzer waits for the port with a bounded count of tries
 # before the first request.
 #
-# Both servers hold the static key of regress/vectors.h, so the two
-# pinned envelopes of that file are the seed. The set_pin envelope
+# Both servers hold the static key of tests/vectors/vectors.h, so the
+# two pinned envelopes of that file are the seed. The set_pin envelope
 # enrolls one record on each server, and the get_pin envelope is the
 # request that the fuzzer mutates. No client library takes part, so
 # the run needs no Python beside the upstream server.
@@ -102,12 +106,14 @@
 # The fuzzer reads no environment variable. These are the arguments:
 #
 #	<object directory>
-#		The object directory of regress/Makefile: the program
-#		cgi of 'make -C regress clean cgi', and its two paths.
+#		The object directory of src/regress/Makefile in the
+#		guest, <work directory>/src/regress: the program cgi
+#		and its two paths, after 'make -C regress clean cgi' in
+#		<work directory>/src.
 #
 #	<work directory>
-#		The work directory of regress/interop in the guest,
-#		with venv and blind_pin_server.
+#		The work directory of tests/interop in the guest, with
+#		src, tests, venv and blind_pin_server.
 #
 #	<case directory>
 #		The directory of the failed cases. The fuzzer creates
@@ -131,7 +137,7 @@ use Fugu::Process;
 use Fugu::Random;
 use Fugu::Signal;
 
-# The port of the upstream server. regress/interop uses 8080, 8081
+# The port of the upstream server. tests/interop uses 8080, 8081
 # and 8082 in the same guest.
 my $PORT = 8083;
 my $URL  = "http://127.0.0.1:$PORT";
@@ -178,13 +184,16 @@ my $cgi    = "$obj/cgi";
 my $pins   = "$obj/pins";
 my $random = "$pins/.random";
 my $python = "$work/venv/bin/python";
-die "fuzz: $cgi: no such program; run make -C regress clean cgi\n"
+die "fuzz: $cgi: no such program; run 'make -C regress clean cgi' "
+    . "in $work/src\n"
     unless -x $cgi;
 die "fuzz: $python: no such program\n"                       unless -x $python;
 
-# The vectors of regress/vectors.h, as one text.
-my $VECTORS = Fugu::File->read("$RealBin/vectors.h")
-    // die "fuzz: $RealBin/vectors.h: cannot read the vectors\n";
+# The vectors of tests/vectors/vectors.h, as one text. The fuzzer
+# sits in tests, beside that directory.
+my $VECTORS_H = "$RealBin/vectors/vectors.h";
+my $VECTORS   = Fugu::File->read($VECTORS_H)
+    // die "fuzz: $VECTORS_H: cannot read the vectors\n";
 
 # The run directory of the upstream server: its key file, its record
 # directory and its log. File::Temp removes it at the exit.
@@ -196,7 +205,7 @@ my %SAVED;
 my $REAL;
 
 # vector($name):
-#	The bytes of one hex vector of regress/vectors.h.
+#	The bytes of one hex vector of tests/vectors/vectors.h.
 sub vector ($name)
 {
 	my ($hex) = $VECTORS =~ /^#define[ \t]+$name[ \t]+"([0-9a-f]+)"/m
@@ -348,8 +357,8 @@ sub same ( $what, $path, $envelope )
 		$u->{status} );
 	die "fuzz: $what: the two answers differ, see $file\n"
 	    . "fuzz: the likely cause: $cgi holds another PINS_DIR or "
-	    . "KEY_PATH than $pins and $obj/private.key; run make -C regress "
-	    . "clean cgi\n";
+	    . "KEY_PATH than $pins and $obj/private.key; run 'make -C "
+	    . "regress clean cgi' in $work/src\n";
 }
 
 # trial($what, $envelope, $allowed):

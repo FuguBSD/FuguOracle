@@ -18,7 +18,7 @@
 #
 # usage: cgi.sh <program> <object directory>
 #
-# regress/Makefile runs this script. The program runs directly, with
+# src/regress/Makefile runs this script. The program runs directly, with
 # the CGI variables in the environment and the body on standard
 # input. The script reads the status, the header block and the body
 # of each answer. The object directory holds the two compile-time
@@ -39,7 +39,9 @@
 # LOG_ERR land in the same file (OPS-WIPE-3, SEC-LOGGING-2).
 #
 # The script needs no package. perl and openssl of the base system
-# convert the hex of vectors.h, and they build one record.
+# convert the hex of tests/vectors/vectors.h, and they build one
+# record. That header sits two directories up, beside the host
+# harness (ARCH-BUILD-5).
 
 set -e
 
@@ -51,6 +53,7 @@ prog=$1
 obj=$2
 dir=$(dirname "$0")
 src=$dir/..
+vectors=$dir/../../tests/vectors/vectors.h
 pins=$obj/pins
 key=$obj/private.key
 rand=$pins/.random
@@ -91,7 +94,7 @@ bytes() {
 #	The hex string of one #define of vectors.h.
 vector() {
 	sed -n "s/^#define[[:space:]]*$1[[:space:]]*\"\([0-9a-f]*\)\".*/\1/p" \
-	    "$dir/vectors.h"
+	    "$vectors"
 }
 
 # unhex(hex):
@@ -257,7 +260,7 @@ tweak_enc_key=$(vector V_TWEAK_REQUEST_ENC_KEY)
 tweak_mac_key=$(vector V_TWEAK_REQUEST_MAC_KEY)
 tweak_counter=$(sed -n \
     's/^#define[[:space:]]*V_TWEAK_COUNTER[[:space:]]*\([0-9]*\)u.*/\1/p' \
-    "$dir/vectors.h")
+    "$vectors")
 if [ -z "$static_priv" ] || [ -z "$get_env" ] || [ -z "$tweak_counter" ]; then
 	echo "cgi.sh: vectors.h holds no vector" >&2
 	exit 1
@@ -443,13 +446,19 @@ rmdir "$record"
 # Each program links static (ARCH-DEPS-4, ARCH-STACK-3). ldd(1)
 # prints one dlib line for a static program, and an exe line with
 # one rlib line for each shared library of a dynamic one. file(1)
-# reports one type for both, so it answers nothing here.
+# reports one type for both, so it answers nothing here. Each
+# program builds in a directory of its own under $src, in obj when
+# make obj made one (ARCH-BUILD-2).
 for program in fuguoracle fuguoracle-keygen; do
-	if [ ! -x "$src/$program" ]; then
+	path=$src/$program/$program
+	if [ -d "$src/$program/obj" ]; then
+		path=$src/$program/obj/$program
+	fi
+	if [ ! -x "$path" ]; then
 		fail "$program: the program is absent; run make in $src"
 		continue
 	fi
-	ldd "$src/$program" > "$work/ldd" 2>&1 || true
+	ldd "$path" > "$work/ldd" 2>&1 || true
 	dlib=$(grep -c '[[:space:]]dlib[[:space:]]' "$work/ldd" || true)
 	rlib=$(grep -c '[[:space:]]rlib[[:space:]]' "$work/ldd" || true)
 	check "$program links static" "1 0" "$dlib $rlib"
@@ -457,7 +466,8 @@ done
 
 # The line count of the C sources stays under the bound of
 # ARCH-LAYOUT-4. The count reads the lines outside the comments and
-# the blank lines.
+# the blank lines. $src holds the flat sources alone, so the test
+# sources of this directory stay out of the count.
 lines=$(awk '
 {
 	line = $0

@@ -17,7 +17,7 @@
 /*
  * The known-answer vectors of the cipher shim (TEST-KAT-1).
  *
- * regress/vectors/generate.py writes this file from libwally. Do not
+ * tests/vectors/generate.py writes this file from libwally. Do not
  * edit it. Every value is a hex string, and a counter or a parity
  * bit is a decimal number. Each request of the transcript holds both
  * sides, so a client implementation reads the same file.

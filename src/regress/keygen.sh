@@ -18,7 +18,7 @@
 #
 # usage: keygen.sh <program> <object directory>
 #
-# regress/Makefile runs this script. The key file and the owner of
+# src/regress/Makefile runs this script. The key file and the owner of
 # that file are compile-time constants of PROG-KEYGEN-2, and no build
 # flag redirects them. The program writes
 # /var/www/fuguoracle/private.key, and it resolves the passwd entry

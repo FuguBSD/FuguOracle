@@ -7,11 +7,12 @@ harness, the fuzzing, the live client test, and the acceptance.
 
 ## Known-answer tests
 
-- **TEST-KAT-1** — The `regress/` suite must hold a known-answer vector for
-  every cipher shim function, generated once from upstream `libwally`. The
-  functions are the two TapTweak derivations, the ECDH shared secret, and the
-  HMAC-SHA512 KDF split. The other functions are envelope encrypt and decrypt,
-  public key recovery, and record encrypt and decrypt.
+- **TEST-KAT-1** — The `src/regress/` suite must hold a known-answer test for
+  every cipher shim function, on a vector of `tests/vectors/vectors.h`,
+  generated once from upstream `libwally`. The functions are the two TapTweak
+  derivations, the ECDH shared secret, and the HMAC-SHA512 KDF split. The other
+  functions are envelope encrypt and decrypt, public key recovery, and record
+  encrypt and decrypt.
 - **TEST-KAT-2** — The vectors are committed as hex. `make regress` must need no
   Python and no network.
 - **TEST-KAT-3** — The TapTweak vector must exist before any other code (see the

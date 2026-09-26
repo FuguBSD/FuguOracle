@@ -18,7 +18,7 @@
 
 usage: interop-checks.py <url> <fixed url> <upstream url> <public key hex>
 
-regress/interop puts this program into the OpenBSD guest, and it runs
+tests/interop puts this program into the OpenBSD guest, and it runs
 the program there, in a directory that holds a 'pins' link to the
 record directory of the service at <url>. The public key is the
 static key of the service, as fuguoracle-keygen prints it, and the

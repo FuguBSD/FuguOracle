@@ -36,12 +36,14 @@ FUGUVM=${FUGUVM:-fuguvm}
 # partition of the guest holds a few megabytes only.
 WORK=/home/fuguoracle
 
-# The source that the guest builds. A new source file joins this
-# list. The Makefile names the two manual pages, so they travel with
-# the source as well.
-SOURCE="Makefile cipher.c cipher.h http.c http.h keygen.c main.c \
-	oracle.c oracle.h pindb.c pindb.h fuguoracle.8 fuguoracle-keygen.8 \
-	regress"
+# The guest layout, one for every script of tests: $WORK/src holds
+# src of the repository, and $WORK/tests holds tests. src holds the
+# flat sources, the archive, the two programs with their manual
+# pages, and the regression tests (ARCH-BUILD-2). tests holds the
+# host harness and the vectors, and the regression tests read the
+# vectors through the include path of tests (ARCH-BUILD-5). A new
+# file joins one of the two directories, and this script names no
+# file.
 
 # The autotools that build the library. The release tarball holds no
 # configure script, and the base system holds no autotools.
@@ -67,18 +69,18 @@ root=$(dirname "$0")/..
 echo "guest: the source"
 $FUGUVM up
 $FUGUVM wait
-$FUGUVM ssh -- sh -c "rm -rf $WORK/src $WORK/library; mkdir -p $WORK/src"
+$FUGUVM ssh -- sh -c "rm -rf $WORK/src $WORK/tests $WORK/library; \
+	mkdir -p $WORK"
 $FUGUVM put "$tarball" "$WORK/library.tar.gz"
-for item in $SOURCE; do
-	$FUGUVM put "$root/$item" "$WORK/src/$item"
-done
+$FUGUVM put "$root/src" "$WORK/src"
+$FUGUVM put "$root/tests" "$WORK/tests"
 
 echo "guest: the library"
 $FUGUVM ssh -- sh -c "set -e; pkg_add -I $PACKAGES; cd $WORK; \
 	mkdir library; tar xzf library.tar.gz -C library; cd library/*; \
 	$VERSIONS ./autogen.sh; ./configure $CONFIGURE; make; make install"
 
-echo "guest: the two programs"
+echo "guest: the archive, the two programs and the tests"
 $FUGUVM ssh -- sh -c "cd $WORK/src; make"
 
 echo "guest: the regression tests"

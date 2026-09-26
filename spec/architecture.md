@@ -89,16 +89,28 @@ recovery, and x-only tweak semantics that the wire protocol assumes.
 
 ```
 fuguoracle/
-├── Makefile            BSD make, bsd.prog.mk style
-├── main.c              CGI entry, dispatch, pledge/unveil, limits
-├── http.c/.h           CGI environment, body read, JSON in/out, base64
-├── cipher.c/.h         Key tweak, ECDH envelope, hashes, AES (EVP)
-├── oracle.c/.h         Payload parsing and the get/set state machine
-├── pindb.c/.h          Records, locking, atomic writes
-├── keygen.c            fuguoracle-keygen
-├── fuguoracle.8        mdoc man page
-├── fuguoracle-keygen.8 mdoc man page
-└── regress/            Known-answer tests and unit tests (make regress)
+├── src/
+│   ├── Makefile            The entry point of the C build, bsd.subdir.mk
+│   ├── main.c              CGI entry, dispatch, pledge/unveil, limits
+│   ├── http.c/.h           CGI environment, body read, JSON in/out, base64
+│   ├── cipher.c/.h         Key tweak, ECDH envelope, hashes, AES (EVP)
+│   ├── oracle.c/.h         Payload parsing and the get/set state machine
+│   ├── pindb.c/.h          Records, locking, atomic writes
+│   ├── keygen.c            fuguoracle-keygen
+│   ├── lib/                libfuguoracle.a of the flat sources, bsd.lib.mk
+│   ├── fuguoracle/         The CGI program and its mdoc man page
+│   ├── fuguoracle-keygen/  The key generator and its mdoc man page
+│   └── regress/            Known-answer tests and unit tests (make regress)
+└── tests/
+    ├── guest               The guest driver: the library, the build, the tests
+    ├── interop             The interop harness and the acceptance
+    ├── fuzz                The differential fuzzer
+    ├── pypi-fetch          The pinned Python distributions of the guest
+    ├── interop-checks.py   The checks of TEST-INTEROP and TEST-ACCEPT
+    ├── interop-upstream.py The upstream test suite against the stack
+    ├── upstream-fixed.py   The upstream server on the fixed random file
+    ├── random.bin          The fixed random source of the acceptance
+    └── vectors/            generate.py writes vectors.h from libwally
 ```
 
 - **ARCH-LAYOUT-1** — Only `cipher.c` can include the `libsecp256k1` and
@@ -120,3 +132,37 @@ fuguoracle/
   step, and it then continues the call or stops it. The entry point must hold no
   test logic of its own. The service program must not carry test code, and it
   must not carry code that only a client needs.
+
+<a id="arch-build"></a>
+
+## The build
+
+- **ARCH-BUILD-1** — The archive sources must sit flat in `src/`. `src/lib` must
+  build the archive `libfuguoracle.a` from them with `.PATH`. Each program
+  directory must link that archive, so each archive source compiles once in the
+  production build.
+- **ARCH-BUILD-2** — `src/Makefile` is the entry point of the C build, and the
+  OpenBSD `make` reads it. Each program must have a directory of its own under
+  `src/`. That directory must hold the Makefile and the manual page of the
+  program, and it must read `bsd.prog.mk`. `SUBDIR` of `src/Makefile` must name
+  each directory that builds. `src/regress` holds the tests, and it must read
+  `bsd.regress.mk`.
+- **ARCH-BUILD-3** — `src/regress` must compile each source that it tests
+  through `.PATH`, with `-DREGRESS`. The compile must set the record directory
+  and the key path of the test build (D-06,
+  [ARCH-LAYOUT-5](architecture.md#arch-layout)). It must not link the archive,
+  because the archive holds no test hook.
+- **ARCH-BUILD-4** — The C build and the gates of the repository root must stay
+  apart. The OpenBSD `make` reads `src/Makefile`, and GNU `make` reads
+  `GNUmakefile`. The org pack of FuguBSD/Tooling owns `GNUmakefile`, so this
+  repository must not edit it.
+- **ARCH-BUILD-5** — The host harness must sit in `tests/`: the guest driver,
+  the interop harness, the fuzzer, the vector generator and its header.
+  `src/regress` must read that header through an include path of `tests/`. The
+  harness runs on the host or in the guest, and never through `src/Makefile`.
+
+The layout follows `usr.bin/ssh` of the OpenBSD tree: the sources sit flat, and
+one directory builds each program beside its manual page. The regress build
+compiles the sources a second time. The test hooks of ARCH-LAYOUT-5 must stay
+out of the archive that the service links. The C build needs an OpenBSD machine,
+and the gates of the repository root need none.

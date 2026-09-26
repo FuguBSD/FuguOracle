@@ -18,7 +18,7 @@
 
 usage: interop-upstream.py <url> <public key hex>
 
-regress/interop puts this program into the OpenBSD guest, and it runs
+tests/interop puts this program into the OpenBSD guest, and it runs
 the program there, in a directory that holds a 'pins' link to the
 record directory of the service. The program runs the tests of the
 upstream test suite that speak protocol v2 to a URL, against the

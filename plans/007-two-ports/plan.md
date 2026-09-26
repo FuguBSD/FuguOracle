@@ -47,20 +47,20 @@ PKG-ORACLE-7). A port never depends on `fuguvm`.
 
 ## Files
 
-| File                                    | Change                                                |
-| --------------------------------------- | ----------------------------------------------------- |
-| `ports/security/libsecp256k1/Makefile`  | The library port                                      |
-| `ports/security/libsecp256k1/distinfo`  | The pinned distfile                                   |
-| `ports/security/libsecp256k1/pkg/DESCR` | The description                                       |
-| `ports/security/libsecp256k1/pkg/PLIST` | The archive, the headers, the pkg-config file         |
-| `ports/security/fuguoracle/Makefile`    | The service port                                      |
-| `ports/security/fuguoracle/distinfo`    | The pinned tag                                        |
-| `ports/security/fuguoracle/pkg/DESCR`   | The description                                       |
-| `ports/security/fuguoracle/pkg/PLIST`   | The files, the user, the sample directories           |
-| `ports/security/fuguoracle/pkg/README`  | The bring-up, the backup, the rotation, the live test |
-| `fuguoracle.8`                          | The backup and the provisioning statements            |
-| `regress/guest`                         | The port build in place of the tarball build          |
-| `spec/STATUS.md`                        | The cited units                                       |
+| File                                    | Change                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------- |
+| `ports/security/libsecp256k1/Makefile`  | The library port                                                                      |
+| `ports/security/libsecp256k1/distinfo`  | The pinned distfile                                                                   |
+| `ports/security/libsecp256k1/pkg/DESCR` | The description                                                                       |
+| `ports/security/libsecp256k1/pkg/PLIST` | The archive, the headers, the pkg-config file                                         |
+| `ports/security/fuguoracle/Makefile`    | The service port, with `WRKSRC` at the `src` directory of the distfile (ARCH-BUILD-2) |
+| `ports/security/fuguoracle/distinfo`    | The pinned tag                                                                        |
+| `ports/security/fuguoracle/pkg/DESCR`   | The description                                                                       |
+| `ports/security/fuguoracle/pkg/PLIST`   | The files, the user, the sample directories                                           |
+| `ports/security/fuguoracle/pkg/README`  | The bring-up, the backup, the rotation, the live test                                 |
+| `src/fuguoracle/fuguoracle.8`           | The backup and the provisioning statements                                            |
+| `tests/guest`                           | The port build in place of the tarball build                                          |
+| `spec/STATUS.md`                        | The cited units                                                                       |
 
 ## Tests
 

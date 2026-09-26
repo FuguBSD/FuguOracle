@@ -19,7 +19,7 @@
 #
 # usage: pypi-fetch <requirements.txt> <output directory>
 #
-# The interop harness regress/interop installs the upstream test
+# The interop harness tests/interop installs the upstream test
 # suite in the OpenBSD guest, and the guest reaches no package index.
 # This tool builds the directory that the harness gives to pip: one
 # file for each pin of the requirements file. FUGUORACLE_PYPI names
