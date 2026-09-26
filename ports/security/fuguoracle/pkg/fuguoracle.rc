@@ -1,7 +1,5 @@
 #!/bin/ksh
 #
-# $OpenBSD$
-#
 # The slowcgi(8) instance of fuguoracle (DEPLOY-SERVICE-1). It runs
 # inside the /var/www chroot, it listens on a dedicated socket, and it
 # runs the CGI program as the user _fuguoracle (SEC-SANDBOX-4). The

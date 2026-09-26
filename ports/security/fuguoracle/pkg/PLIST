@@ -1,0 +1,27 @@
+@newgroup _fuguoracle:906
+@newuser _fuguoracle:906:_fuguoracle::FuguOracle service:/var/empty:/sbin/nologin
+@rcscript ${RCDIR}/fuguoracle
+@man man/man8/fuguoracle-keygen.8
+@man man/man8/fuguoracle.8
+@bin sbin/fuguoracle-keygen
+share/doc/pkg-readmes/${PKGSTEM}
+share/examples/fuguoracle/
+share/examples/fuguoracle/httpd.conf
+@cwd /var/www
+@mode 0555
+@bin cgi-bin/fuguoracle
+@mode
+@mode 0710
+@owner root
+@group _fuguoracle
+@sample fuguoracle/
+@mode
+@owner
+@group
+@mode 0700
+@owner _fuguoracle
+@group _fuguoracle
+@sample fuguoracle/pins/
+@mode
+@owner
+@group

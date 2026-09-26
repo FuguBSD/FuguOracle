@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: September 24 2026 $
+.Dd $Mdocdate: September 26 2026 $
 .Dt FUGUORACLE 8
 .Os
 .Sh NAME
@@ -135,6 +135,63 @@ calls
 and it removes the file.
 The client cannot recover its secret through this service after the
 wipe.
+.Sh CLIENT PROVISIONING
+The operator gives each client two values: the URL of the oracle, and
+the static public key.
+The URL is the public endpoint, for example https://oracle.example.org,
+and it must not end with a slash: the client appends
+.Pa /get_pin
+and
+.Pa /set_pin
+to it.
+The static public key is the hex string that
+.Xr fuguoracle-keygen 8
+prints.
+.Pp
+.Xr httpd 8
+ends TLS, and the client does not require it: the envelope
+authenticates the oracle, and TLS protects the metadata and the
+availability.
+A deployment with a private CA must also provision its TLS root
+certificate, and the client verifies the endpoint with it.
+.Pp
+A client can hold a second URL of the oracle, for example an onion
+address, and it selects between the two.
+Both URLs must point at the same instance, because the records and the
+static key live on one host.
+.Sh BACKUP
+The static key is the service.
+A loss of
+.Pa /var/www/fuguoracle/private.key ,
+or of the
+.Pa pins/
+directory, makes the PIN unlock of every enrolled client permanently
+inoperable.
+The operator must back up the static key offline at enrollment time,
+and must treat the
+.Pa pins/
+directory as precious.
+.Pp
+The operator must restore
+.Pa pins/
+only after an incident review: a restore rewinds the attempt counter
+and the replay counter of each record to the backup time.
+.Pp
+A key rotation in place is not supported.
+Every storage key derives from the static key, so a new key orphans
+every record.
+On a suspected key compromise, the operator must stop the service,
+and must clear the key and the records:
+.Pa /var/www/fuguoracle/private.key ,
+and the content of
+.Pa pins/ .
+The operator must then make a new key with
+.Xr fuguoracle-keygen 8 ,
+and must start the service.
+The operator must then provision the new public key into every client,
+and every client must run
+.Li set_pin
+again.
 .Sh ENVIRONMENT
 .Xr httpd 8
 and

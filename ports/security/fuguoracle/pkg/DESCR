@@ -1,0 +1,10 @@
+FuguOracle is a blind PIN oracle service: a virtual secure element for
+client devices and client programs. A client holds a secret in encrypted
+form, under a key that the client alone cannot rebuild. The oracle holds
+one key share for each client, and it releases the share only to a
+request that proves the correct PIN. It does not learn the PIN or the
+secret, and it destroys the share after three bad attempts.
+
+The service implements version 2 of the Blockstream blind_pin_server
+protocol, and Blockstream Jade is the reference client. httpd(8) and
+slowcgi(8) of the base system serve it, one process for each request.
