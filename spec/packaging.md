@@ -52,7 +52,7 @@ BUILD_DEPENDS = security/libsecp256k1
   `/var/www/fuguoracle/pins/` with mode `0700` and owner
   `_fuguoracle:_fuguoracle`. The parent directory holds the key file that
   `fuguoracle-keygen` writes (see [PROG-KEYGEN-2](programs.md#prog-keygen)).
-- **PKG-ORACLE-4** — `make regress` must run the known-answer test suite without
+- **PKG-ORACLE-4** — `make test` must run the known-answer test suite without
   network access.
 - **PKG-ORACLE-5** — The port must declare `security/libsecp256k1` as a build
   dependency only. The static link leaves no `WANTLIB` beyond base.

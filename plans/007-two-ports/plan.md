@@ -2,10 +2,10 @@
 
 ## Status
 
-In progress. The library port and the guest build of it landed. The service
-port, the pkg-readme, the manual page and the live test remain.
+In progress. The two ports, the pkg-readme and the manual statements landed, and
+the arm64 builds pass. The amd64 builds and the live client test remain.
 
-Implements: PKG-ORACLE, DEPLOY-BACKUP, CLIENT-PROVISION, CLIENT-JADE, TEST-LIVE.
+Implements: PKG-ORACLE, CLIENT-JADE, TEST-LIVE.
 
 ## Purpose
 
@@ -46,23 +46,13 @@ PKG-ORACLE-7). A port never depends on `fuguvm`.
 
 ## Files
 
-| File                                   | Change                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------- |
-| `ports/security/fuguoracle/Makefile`   | The service port, with `WRKSRC` at the `src` directory of the distfile (ARCH-BUILD-2) |
-| `ports/security/fuguoracle/distinfo`   | The pinned tag                                                                        |
-| `ports/security/fuguoracle/pkg/DESCR`  | The description                                                                       |
-| `ports/security/fuguoracle/pkg/PLIST`  | The files, the user, the sample directories                                           |
-| `ports/security/fuguoracle/pkg/README` | The bring-up, the backup, the rotation, the live test                                 |
-| `src/fuguoracle/fuguoracle.8`          | The backup and the provisioning statements                                            |
-| `spec/STATUS.md`                       | The cited units                                                                       |
+| File             | Change          |
+| ---------------- | --------------- |
+| `spec/STATUS.md` | The cited units |
 
 ## Tests
 
-- `portcheck` and `make port-lib-depends-check` of the ports tree pass on both
-  ports, in the guest.
-- `make regress` of the service port passes with the network off.
-- A `pkg_add` of the built package, then the bring-up of DEPLOY-SERVICE, serves
-  one round trip from the upstream `client.py`.
+- The two ports build, and their test targets pass, on the amd64 guest.
 - The operator provisions a spare reference client and passes the full cycle:
   set the PIN, unlock, and the three-strike wipe (TEST-LIVE-1). The register
   note records the date.

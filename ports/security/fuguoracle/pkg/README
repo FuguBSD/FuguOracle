@@ -1,0 +1,89 @@
++-------------------------------------------------------------------------------
+| Running ${PKGSTEM} on OpenBSD
++-------------------------------------------------------------------------------
+
+Bring-up
+========
+
+The package installs the CGI program at
+${LOCALSTATEDIR}/www/cgi-bin/fuguoracle, the key generator at
+${PREFIX}/sbin/fuguoracle-keygen, and the rc.d script ${RCDIR}/fuguoracle.
+The script runs a dedicated slowcgi(8) inside the ${LOCALSTATEDIR}/www
+chroot, as the user _fuguoracle.
+
+1. Add the server block of ${PREFIX}/share/examples/fuguoracle/httpd.conf
+   to ${SYSCONFDIR}/httpd.conf. Put the host name of the service in place of
+   oracle.example.org. acme-client(1) supplies the certificate and the
+   key at the two paths of the block.
+
+2. Make the static key, and note the public key that the program prints:
+
+   # fuguoracle-keygen
+
+3. Enable and start the services:
+
+   # rcctl enable httpd fuguoracle
+   # rcctl start fuguoracle httpd
+
+The service needs no cron job and no cleanup task. Monitor the free space
+of the filesystem that holds ${LOCALSTATEDIR}/www/fuguoracle/pins: any
+caller can create a record. A dedicated filesystem on
+${LOCALSTATEDIR}/www/fuguoracle keeps a fill away from the rest of
+${LOCALSTATEDIR}/www.
+
+Backup
+======
+
+The static key is the service. A loss of
+${LOCALSTATEDIR}/www/fuguoracle/private.key, or of the pins directory,
+makes the PIN unlock of every enrolled client permanently inoperable.
+Back up the key offline at enrollment time, and treat the pins directory
+as precious.
+
+Restore the pins directory only after an incident review. A restore
+rewinds the attempt counter and the replay counter of each record to the
+backup time.
+
+Key rotation
+============
+
+A rotation in place is not supported: every storage key derives from the
+static key, so a new key orphans every record. On a suspected key
+compromise:
+
+1. Stop the service, and clear the key and the records:
+
+   # rcctl stop fuguoracle
+   # rm ${LOCALSTATEDIR}/www/fuguoracle/private.key
+   # rm ${LOCALSTATEDIR}/www/fuguoracle/pins/*
+
+2. Make a new key:
+
+   # fuguoracle-keygen
+
+3. Start the service. Provision the new public key into every client,
+   and have every client run set_pin again.
+
+Client provisioning
+===================
+
+Each client needs the oracle URL and the static public key. fuguoracle(8)
+states the provisioning rules: the URL form, the TLS position, a private
+CA, and a second URL.
+
+Blockstream Jade
+================
+
+Provision a Jade with the companion app, or with the gdk call
+update_pinserver: set the oracle URL and the static public key. An
+initialized Jade refuses a change of the oracle public key, with the
+message "Cannot update initialized unit". Provision the oracle before the
+first seed setup, or factory-reset the unit first. A URL update and a
+certificate update stay possible on an initialized unit.
+
+Live test
+=========
+
+Before any real use, provision a spare reference client against the
+oracle, and pass a full cycle: set the PIN, unlock, and the three-strike
+wipe. Record the date of the pass.
