@@ -52,11 +52,14 @@
 # the guest again with 'fuguvm up', provisions it, stops it, and
 # saves the snapshot (TEST-INTEROP-5). Exit code 7 of the wait
 # reports a timeout. The provisioning holds, one call for each step:
-# the packages, then regress/guest for the library, the programs and
-# the regression tests, then the upstream checkout and the Python
-# distributions by 'fuguvm put', then a venv, then the pip run, then
-# an import of wallycore, flask and requests. A change of one of these
-# steps needs a new snapshot: run 'fuguvm snapshot rm provisioned'.
+# the packages, then the Fugu distribution, then regress/guest for
+# the library, the programs and the regression tests, then the
+# upstream checkout and the Python distributions by 'fuguvm put',
+# then a venv, then the pip run, then an import of wallycore, flask
+# and requests. The Fugu step fetches cpanm and installs Fugu from
+# CPAN, because the fuzzer of TEST-FUZZ runs in the guest on that
+# library. A change of one of these steps needs a new snapshot: run
+# 'fuguvm snapshot rm provisioned'.
 #
 # The second part deploys the tree. The harness puts the tracked files
 # of the working tree into the guest with 'fuguvm put', and the guest
@@ -197,8 +200,9 @@ my $UPSTREAM_COMMIT = '62b920ef50b8e035d26916d9ed77b42903664993';
 # The packages of the provisioning, beside the autotools that
 # regress/guest installs. The pip run builds wallycore from source: it
 # needs gmake for the automake tree, bash for a script of that tree,
-# and swig for the wrapper that the same tree removes.
-my $PACKAGES = 'python%3 py3-pip bash gmake swig';
+# and swig for the wrapper that the same tree removes. cpanm reads
+# CPAN over HTTPS, so it needs IO::Socket::SSL.
+my $PACKAGES = 'python%3 py3-pip bash gmake swig p5-IO-Socket-SSL';
 
 # The reports of the two check programs, on the host.
 my %REPORT = (
@@ -287,6 +291,17 @@ SH
 # of wallycore, and the build reads make and python from the PATH, so
 # the pip step puts the shim directory and the venv on the PATH.
 my $SHIM = "#!/bin/sh\nexec /usr/local/bin/gmake \"\$@\"\n";
+
+# The script of the Fugu distribution: cpanm from its release site,
+# because the packages of OpenBSD hold no cpanm, then Fugu from CPAN.
+# --notest skips the test suite of Fugu: that suite needs Perl::Critic
+# and Perl::Tidy, and the guest needs the library alone.
+my $CPANM = <<'SH';
+set -e
+ftp -Vo /usr/local/bin/cpanm https://cpanmin.us
+chmod 0755 /usr/local/bin/cpanm
+cpanm --notest Fugu
+SH
 
 # failure($what, $result):
 #	The message of one failed command: the reason, and the two
@@ -420,6 +435,9 @@ sub provision ()
 {
 	step('the packages');
 	guest_ok( 'the packages', "pkg_add -I $PACKAGES", $TIMEOUT{build} );
+
+	step('the Fugu distribution');
+	guest_ok( 'the Fugu distribution', $CPANM, $TIMEOUT{build} );
 
 	step('the library, the programs and the regression tests');
 	host_ok(
