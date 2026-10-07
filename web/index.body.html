@@ -1,19 +1,19 @@
 <h1>FuguOracle</h1>
 
-<p>FuguOracle is a blind PIN oracle service, designed after OpenBSD
-principles. The service is a virtual secure element for client
-devices and client programs. A client holds a secret in encrypted
-form, under a key that the client alone cannot rebuild.</p>
+<p>FuguOracle is a blind PIN oracle service. It holds a key share for
+each client, and releases the share to the correct PIN alone. The
+oracle does not learn the PIN, and it does not learn the protected
+secret. After three bad PIN attempts, the oracle destroys the key
+share.</p>
 
-<p>The oracle holds a key share for each client, and it releases the
-share only for a request that proves the correct PIN. The oracle does
-not learn the PIN, and it does not learn the protected secret. After
-three bad PIN attempts, the oracle destroys the key share.</p>
+<p>A client holds its secret in encrypted form, under a key that the
+client alone cannot rebuild. The service is a virtual secure element
+for client devices and client programs.</p>
 
 <p>The service implements version 2 of the Blockstream
 <code>blind_pin_server</code> protocol, and Blockstream Jade is the
 reference client. <a href="https://pass.fugubsd.org/">FuguPass</a> is
-a second client.</p>
+a second client. The design follows OpenBSD principles.</p>
 
 <h2>Documentation</h2>
 
