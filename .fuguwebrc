@@ -1,6 +1,8 @@
 # The website, built by fuguweb(1).
 
-site = FuguOracle
+site   = FuguOracle
+url    = https://oracle.fugubsd.org/
+footer = footer.body.html
 
 nav "index.html" {
 	label = Home
